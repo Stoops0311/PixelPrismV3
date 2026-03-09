@@ -3,38 +3,21 @@
 import { Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  InstagramIcon,
-  TiktokIcon,
-  Facebook02Icon,
-  Image02Icon,
-  Calendar03Icon,
-  Award02Icon,
-  AiChat02Icon,
   GridViewIcon,
-  Rocket01Icon,
   PackageIcon,
+  Calendar03Icon,
 } from "@hugeicons/core-free-icons"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DS2StatCard } from "@/components/ds2/stat-card"
-import { DS2DataTable } from "@/components/ds2/data-table"
-import type { DS2Column } from "@/components/ds2/data-table"
-import { StatusBadge } from "@/components/ds2/status-badge"
 import { LogosDigestCard } from "@/components/ds2/logos-digest-card"
-import {
-  MOCK_BRANDS,
-  MOCK_USER,
-  MOCK_CREDITS,
-  MOCK_UPCOMING_POSTS,
-  MOCK_ACTIVITY_FEED,
-  MOCK_LOGOS_DIGEST,
-  MOCK_BRAND_SPARKLINES,
-} from "@/lib/mock-data"
-import type { UpcomingPost, ActivityEntry } from "@/types/dashboard"
-import { format } from "date-fns"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import type { Brand } from "@/types/dashboard"
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -45,247 +28,61 @@ function getGreeting(): string {
   return "Good evening"
 }
 
-const PLATFORM_ICONS: Record<string, typeof InstagramIcon> = {
-  instagram: InstagramIcon,
-  tiktok: TiktokIcon,
-  facebook: Facebook02Icon,
-}
-
-const ACTIVITY_ICONS: Record<string, typeof Image02Icon> = {
-  image: Image02Icon,
-  post: Calendar03Icon,
-  milestone: Award02Icon,
-  logos: AiChat02Icon,
-  brand: GridViewIcon,
-}
-
-// ── Brand Summary Card (page-local) ─────────────────────────────────────
-
-function BrandSummaryCard({ brand }: { brand: typeof MOCK_BRANDS[number] }) {
-  const sparklineData = MOCK_BRAND_SPARKLINES[brand.id] ?? []
-
-  // Build SVG polyline points for a 200x40 viewbox
-  const svgWidth = 200
-  const svgHeight = 40
-  const padding = 2
-  const values = sparklineData.map((p) => p.followers)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
-
-  const points = values
-    .map((v, i) => {
-      const x = padding + (i / (values.length - 1)) * (svgWidth - padding * 2)
-      const y = svgHeight - padding - ((v - min) / range) * (svgHeight - padding * 2)
-      return `${x},${y}`
-    })
-    .join(" ")
-
-  // Fill polygon: close the path along the bottom
-  const fillPoints = `${padding},${svgHeight} ${points} ${svgWidth - padding},${svgHeight}`
-
-  return (
-    <Link href={`/dashboard/${brand.slug}`}>
-      <Card className="cursor-pointer">
-        <CardContent>
-          <div className="flex items-center gap-3 mb-4">
-            <Avatar>
-              <AvatarFallback
-                style={{
-                  background: "rgba(244,185,100,0.08)",
-                  color: "#f4b964",
-                  fontFamily: "'Neue Montreal', sans-serif",
-                  fontWeight: 700,
-                  fontSize: 12,
-                }}
-              >
-                {brand.initials}
-              </AvatarFallback>
-            </Avatar>
-            <h4 className="sb-h4" style={{ color: "#eaeef1" }}>
-              {brand.name}
-            </h4>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-4">
-            <div>
-              <p className="sb-caption" style={{ color: "#6d8d9f" }}>Followers</p>
-              <p className="sb-data" style={{ color: "#eaeef1" }}>
-                {brand.followers.toLocaleString()}
-              </p>
-            </div>
-            <div style={{ borderLeft: "1px solid rgba(244,185,100,0.08)", paddingLeft: 24 }}>
-              <p className="sb-caption" style={{ color: "#6d8d9f" }}>Engagement</p>
-              <p className="sb-data" style={{ color: "#eaeef1" }}>
-                {brand.engagementRate}%
-              </p>
-            </div>
-          </div>
-
-          {values.length > 1 && (
-            <svg
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              width="100%"
-              height={40}
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id={`spark-fill-${brand.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f4b964" stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="#f4b964" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <polygon
-                points={fillPoints}
-                fill={`url(#spark-fill-${brand.id})`}
-              />
-              <polyline
-                points={points}
-                fill="none"
-                stroke="#f4b964"
-                strokeWidth="2"
-                className="sparkline-draw"
-              />
-            </svg>
-          )}
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
-
-// ── Activity Feed (page-local) ──────────────────────────────────────────
-
-function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
-  return (
-    <div>
-      {entries.map((entry) => {
-        const iconDef = ACTIVITY_ICONS[entry.icon]
-        return (
-          <div key={entry.id} className="sb-item">
-            <div className="flex items-start gap-4">
-              <span
-                className="flex-shrink-0"
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: 700,
-                  fontSize: 11,
-                  letterSpacing: "0.02em",
-                  color: "#6d8d9f",
-                  minWidth: 72,
-                }}
-              >
-                {format(new Date(entry.timestamp), "h:mm a")}
-              </span>
-              {iconDef && (
-                <HugeiconsIcon
-                  icon={iconDef}
-                  size={16}
-                  color="#6d8d9f"
-                  className="flex-shrink-0 mt-0.5"
-                />
-              )}
-              <p className="sb-body-sm" style={{ color: "#d4dce2" }}>
-                {entry.description}
-              </p>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────
 
-const totalFollowers = MOCK_BRANDS.reduce((sum, b) => sum + b.followers, 0)
-const avgEngagement = (
-  MOCK_BRANDS.reduce((sum, b) => sum + b.engagementRate, 0) / MOCK_BRANDS.length
-).toFixed(1)
+/** Map a Convex brand document to the Brand shape expected by UI */
+function toBrand(doc: any): Brand {
+  const initials = doc.name
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
 
-const upcomingPostColumns: DS2Column<UpcomingPost>[] = [
-  {
-    key: "brandInitials",
-    label: "Brand",
-    render: (_val: string, row: UpcomingPost) => (
-      <div className="flex items-center gap-2">
-        <Avatar size="sm">
-          <AvatarFallback
-            style={{
-              background: "rgba(244,185,100,0.08)",
-              color: "#f4b964",
-              fontFamily: "'Neue Montreal', sans-serif",
-              fontWeight: 700,
-              fontSize: 10,
-            }}
-          >
-            {row.brandInitials}
-          </AvatarFallback>
-        </Avatar>
-        <span className="sb-body-sm" style={{ color: "#d4dce2" }}>
-          {row.brandName}
-        </span>
-      </div>
-    ),
-  },
-  {
-    key: "platform",
-    label: "Platform",
-    render: (val: string) => {
-      const iconDef = PLATFORM_ICONS[val]
-      return iconDef ? (
-        <HugeiconsIcon icon={iconDef} size={18} color="#6d8d9f" />
-      ) : (
-        <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>{val}</span>
-      )
-    },
-  },
-  {
-    key: "preview",
-    label: "Preview",
-    render: (val: string) => (
-      <span
-        className="sb-body-sm"
-        style={{
-          color: "#d4dce2",
-          display: "block",
-          maxWidth: 320,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {val}
-      </span>
-    ),
-  },
-  {
-    key: "scheduledAt",
-    label: "Scheduled",
-    isData: true,
-    render: (val: string) => {
-      const d = new Date(val)
-      return (
-        <span className="sb-data" style={{ color: "#d4dce2", fontSize: 12, fontWeight: 500 }}>
-          {format(d, "MMM d")} &middot; {format(d, "h:mm a")}
-        </span>
-      )
-    },
-  },
-  {
-    key: "status",
-    label: "Status",
-    render: (val: string) => <StatusBadge status={val} />,
-  },
-]
+  return {
+    id: doc._id,
+    slug: doc.slug,
+    name: doc.name,
+    initials,
+    followers: doc.totalFollowers ?? 0,
+    engagementRate: doc.avgEngagementRate ?? 0,
+  }
+}
+
+/** Map subscription tier string to plan label */
+function tierToPlan(tier: string): string {
+  switch (tier) {
+    case "starter":
+      return "Starter"
+    case "enterprise":
+      return "Enterprise"
+    default:
+      return "Professional"
+  }
+}
 
 function GlobalOverviewContent() {
-  const firstName = MOCK_USER.name.split(" ")[0]
+  const convexUser = useQuery(api.users.current)
+  const convexBrands = useQuery(api.brands.list)
+  const creditBalance = useQuery(api.credits.getBalance)
   const searchParams = useSearchParams()
   const router = useRouter()
   const forceEmpty = searchParams.get('empty') === 'true'
 
-  const brands = forceEmpty ? [] : MOCK_BRANDS
+  // Loading state
+  if (convexUser === undefined || convexBrands === undefined || creditBalance === undefined) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <DS2Spinner size="lg" />
+      </div>
+    )
+  }
+
+  const firstName = convexUser?.name?.split(" ")[0] ?? "there"
+  const credits = creditBalance?.total ?? 0
+  const planLabel = tierToPlan(convexUser?.subscriptionTier ?? "free")
+
+  const brands: Brand[] = forceEmpty ? [] : (convexBrands ?? []).map(toBrand)
   const showEmpty = brands.length === 0
 
   const totalFollowers = showEmpty ? 0 : brands.reduce((sum, b) => sum + b.followers, 0)
@@ -293,7 +90,7 @@ function GlobalOverviewContent() {
 
   if (showEmpty) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-32">
         {/* A. Greeting */}
         <div suppressHydrationWarning>
           <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
@@ -308,8 +105,8 @@ function GlobalOverviewContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <DS2StatCard
             label="Credits Remaining"
-            value={MOCK_CREDITS.toString()}
-            description="Professional plan"
+            value={credits.toString()}
+            description={`${planLabel} plan`}
             trend={{ value: "Ready to use", direction: "neutral" }}
             valueStyle={{ color: "#f4b964" }}
           />
@@ -349,7 +146,7 @@ function GlobalOverviewContent() {
                 icon: GridViewIcon,
                 step: "1",
                 title: "Create a brand",
-                description: "Tell Logos about your business and define your brand voice"
+                description: "Tell us about your business and define your brand voice"
               },
               {
                 icon: PackageIcon,
@@ -402,16 +199,16 @@ function GlobalOverviewContent() {
           </div>
         </div>
 
-        {/* D. Logos Welcome */}
+        {/* D. AI Welcome */}
         <div>
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             AI Companion
           </p>
           <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
-            Meet Logos
+            Meet Your Assistant
           </h3>
           <LogosDigestCard
-            insightText="Welcome to PixelPrism. I'm Logos, your AI marketing companion. Create your first brand and I'll help you build your online presence."
+            insightText="Welcome to PixelPrism. Your AI marketing assistant helps you build your online presence from day one."
             timestamp={new Date().toISOString()}
             ctaLabel="Get Started"
           />
@@ -421,7 +218,7 @@ function GlobalOverviewContent() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-32">
       {/* A. Greeting */}
       <div suppressHydrationWarning>
         <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
@@ -436,20 +233,20 @@ function GlobalOverviewContent() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <DS2StatCard
           label="Credits Remaining"
-          value={MOCK_CREDITS.toString()}
-          description="Professional plan"
-          trend={{ value: "15 this month", direction: "up" }}
+          value={credits.toString()}
+          description={`${planLabel} plan`}
+          trend={{ value: `${creditBalance?.allocation ?? 0}/mo allocation`, direction: "neutral" }}
           valueStyle={{ color: "#f4b964" }}
         />
         <DS2StatCard
           label="Total Followers"
           value={totalFollowers.toLocaleString()}
-          trend={{ value: "8.3%", direction: "up" }}
+          trend={{ value: `${brands.length} brand(s)`, direction: "neutral" }}
         />
         <DS2StatCard
           label="Engagement Rate"
-          value={`${avgEngagement}%`}
-          trend={{ value: "0.5%", direction: "up" }}
+          value={`${avgEngagement.toFixed(1)}%`}
+          trend={{ value: "Avg across brands", direction: "neutral" }}
         />
       </div>
 
@@ -458,20 +255,58 @@ function GlobalOverviewContent() {
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Portfolio</p>
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Your Brands</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {MOCK_BRANDS.map((brand) => (
-            <BrandSummaryCard key={brand.id} brand={brand} />
+          {brands.map((brand) => (
+            <Link key={brand.id} href={`/dashboard/${brand.slug}`}>
+              <Card className="cursor-pointer">
+                <CardContent>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Avatar>
+                      <AvatarFallback
+                        style={{
+                          background: "rgba(244,185,100,0.08)",
+                          color: "#f4b964",
+                          fontFamily: "'Neue Montreal', sans-serif",
+                          fontWeight: 700,
+                          fontSize: 12,
+                        }}
+                      >
+                        {brand.initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <h4 className="sb-h4" style={{ color: "#eaeef1" }}>
+                      {brand.name}
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="sb-caption" style={{ color: "#6d8d9f" }}>Followers</p>
+                      <p className="sb-data" style={{ color: "#eaeef1" }}>
+                        {brand.followers.toLocaleString()}
+                      </p>
+                    </div>
+                    <div style={{ borderLeft: "1px solid rgba(244,185,100,0.08)", paddingLeft: 24 }}>
+                      <p className="sb-caption" style={{ color: "#6d8d9f" }}>Engagement</p>
+                      <p className="sb-data" style={{ color: "#eaeef1" }}>
+                        {brand.engagementRate}%
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>
 
-      {/* D. Logos Weekly Digest */}
+      {/* D. AI Weekly Digest */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>AI Insights</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Logos Weekly Digest</h3>
+        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Weekly AI Digest</h3>
         <LogosDigestCard
-          insightText={MOCK_LOGOS_DIGEST.insightText}
-          timestamp={MOCK_LOGOS_DIGEST.timestamp}
-          ctaLabel="Chat with Logos"
+          insightText="As you create content and grow your audience, your AI assistant provides weekly insights and recommendations."
+          timestamp={new Date().toISOString()}
+          ctaLabel="View Insights"
         />
       </div>
 
@@ -479,7 +314,13 @@ function GlobalOverviewContent() {
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Scheduling</p>
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Upcoming Posts</h3>
-        <DS2DataTable columns={upcomingPostColumns} data={MOCK_UPCOMING_POSTS} />
+        <Card>
+          <CardContent>
+            <p className="sb-body" style={{ color: "#6d8d9f" }}>
+              No posts scheduled yet. Connect social accounts to start scheduling.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* F. Activity Feed */}
@@ -488,7 +329,9 @@ function GlobalOverviewContent() {
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Recent Activity</h3>
         <Card>
           <CardContent>
-            <ActivityFeed entries={MOCK_ACTIVITY_FEED} />
+            <p className="sb-body" style={{ color: "#6d8d9f" }}>
+              Your activity will appear here as you create brands, generate images, and schedule posts.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -498,7 +341,7 @@ function GlobalOverviewContent() {
 
 export default function GlobalOverviewPage() {
   return (
-    <Suspense fallback={<div className="p-8">Loading...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><DS2Spinner size="lg" /></div>}>
       <GlobalOverviewContent />
     </Suspense>
   )

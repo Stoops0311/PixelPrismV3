@@ -50,3 +50,23 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
   },
 ]
+
+export const PLAN_PRICE_BY_TIER = {
+  free: 0,
+  starter: 20,
+  professional: 30,
+  enterprise: 45,
+  none: 0,
+} as const
+
+export type CreditPack = {
+  key: "credits_100" | "credits_300" | "credits_1000"
+  credits: number
+  price: number
+}
+
+export const CREDIT_PACKS: CreditPack[] = [
+  { key: "credits_100", credits: 100, price: 35 },
+  { key: "credits_300", credits: 300, price: 90 },
+  { key: "credits_1000", credits: 1000, price: 250 },
+]

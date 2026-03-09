@@ -21,6 +21,14 @@ export const create = internalMutation({
       email: args.email,
       name: args.name,
       imageUrl: args.imageUrl,
+      // Defaults for new users — free tier: 5 credits/month, 1 brand, 1 social
+      onboardingComplete: false,
+      subscriptionTier: "free",
+      monthlyCreditsAllocation: 5,
+      monthlyCreditsRemaining: 5,
+      topUpCreditsRemaining: 0,
+      maxBrands: 1,
+      maxSocialAccounts: 1,
     })
   },
 })
@@ -45,6 +53,13 @@ export const update = internalMutation({
         email: args.email,
         name: args.name,
         imageUrl: args.imageUrl,
+        onboardingComplete: false,
+        subscriptionTier: "free",
+        monthlyCreditsAllocation: 5,
+        monthlyCreditsRemaining: 5,
+        topUpCreditsRemaining: 0,
+        maxBrands: 1,
+        maxSocialAccounts: 1,
       })
     }
 
@@ -82,4 +97,3 @@ export const current = query({
       .unique()
   },
 })
-

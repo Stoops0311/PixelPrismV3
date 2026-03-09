@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Image02Icon, Add01Icon, PackageIcon } from "@hugeicons/core-free-icons"
 import {
@@ -23,22 +25,25 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { MOCK_PRODUCTS } from "@/lib/mock-data"
-import type { Product } from "@/types/dashboard"
 import { DS2EmptyStateCard } from "@/components/ds2/empty-state-card"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import type { Id } from "@/convex/_generated/dataModel"
 
 // ── Product Card ─────────────────────────────────────────────────────────
 
-function ProductCard({ product, brandSlug }: { product: Product; brandSlug: string }) {
+function ProductCard({ product, brandSlug }: { product: { _id: Id<"products">; name: string; description: string; generatedImagesCount: number; gradientPreview?: string }; brandSlug: string }) {
+  const router = useRouter()
+  const gradient = product.gradientPreview ?? "linear-gradient(135deg, #1a2a3a 0%, #2a3a4a 50%, #1a3a4a 100%)"
+
   return (
-    <Link href={`/dashboard/${brandSlug}/products/${product.id}`}>
+    <Link href={`/dashboard/${brandSlug}/products/${product._id}`}>
       <Card className="cursor-pointer overflow-hidden group">
         {/* Product image placeholder */}
         <div className="w-full overflow-hidden" style={{ aspectRatio: "16 / 10" }}>
           <div
-            className="w-full h-full flex items-center justify-center transition-transform duration-300 group-hover/card:scale-[1.02]"
+            className="w-full h-full flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.02]"
             style={{
-              background: product.gradient,
+              background: gradient,
               transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
             }}
           >
@@ -61,7 +66,7 @@ function ProductCard({ product, brandSlug }: { product: Product; brandSlug: stri
           <div className="flex items-center gap-1.5 mt-3">
             <HugeiconsIcon icon={Image02Icon} size={14} color="#6d8d9f" />
             <span className="sb-caption" style={{ color: "#6d8d9f" }}>
-              {product.imageCount} images
+              {product.generatedImagesCount} images
             </span>
           </div>
         </CardContent>
@@ -72,7 +77,7 @@ function ProductCard({ product, brandSlug }: { product: Product; brandSlug: stri
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              window.location.href = `/dashboard/${brandSlug}/studio?product=${product.id}`
+              router.push(`/dashboard/${brandSlug}/studio?product=${product._id}`)
             }}
           >
             Open in Studio
@@ -85,13 +90,39 @@ function ProductCard({ product, brandSlug }: { product: Product; brandSlug: stri
 
 // ── Add Product Dialog ───────────────────────────────────────────────────
 
-function AddProductDialog({ triggerOnly = false }: { triggerOnly?: boolean }) {
+function AddProductDialog({ brandId }: { brandId?: Id<"brands"> }) {
   const [step, setStep] = useState(1)
   const [open, setOpen] = useState(false)
   const [direction, setDirection] = useState<"forward" | "back">("forward")
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
+
+  const createProduct = useMutation(api.products.create)
+
+  const handleCreate = async () => {
+    if (!brandId || !name.trim()) return
+    setIsCreating(true)
+    try {
+      await createProduct({
+        brandId,
+        name: name.trim(),
+        description: description.trim(),
+      })
+      setOpen(false)
+      setName("")
+      setDescription("")
+      setStep(1)
+      setDirection("forward")
+    } catch {
+      // Error handled by Convex
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setStep(1); setDirection("forward") } }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setStep(1); setDirection("forward"); setName(""); setDescription("") } }}>
       <DialogTrigger asChild>
         <Button className="sb-btn-primary">
           <HugeiconsIcon icon={Add01Icon} size={16} className="mr-2" />
@@ -120,11 +151,20 @@ function AddProductDialog({ triggerOnly = false }: { triggerOnly?: boolean }) {
           >
             <div className="space-y-2">
               <Label>Product Name</Label>
-              <Input placeholder="e.g. Summer Cold Brew" />
+              <Input
+                placeholder="e.g. Summer Cold Brew"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea placeholder="Describe your product in a few sentences..." rows={3} />
+              <Textarea
+                placeholder="Describe your product in a few sentences..."
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
           </div>
         ) : (
@@ -165,15 +205,17 @@ function AddProductDialog({ triggerOnly = false }: { triggerOnly?: boolean }) {
             <Button
               className="sb-btn-primary"
               onClick={() => { setDirection("forward"); setStep(2) }}
+              disabled={!name.trim()}
             >
               Next
             </Button>
           ) : (
             <Button
               className="sb-btn-primary"
-              onClick={() => setOpen(false)}
+              onClick={handleCreate}
+              disabled={isCreating || !brandId}
             >
-              Create Product
+              {isCreating ? "Creating..." : "Create Product"}
             </Button>
           )}
         </DialogFooter>
@@ -190,10 +232,32 @@ export default function ProductsPage() {
   const searchParams = useSearchParams()
   const forceEmpty = searchParams.get('empty') === 'true'
 
-  const showEmpty = forceEmpty || MOCK_PRODUCTS.length === 0
+  const brand = useQuery(api.brands.getBySlug, { slug: brandSlug })
+  const products = useQuery(api.products.listByBrand, brand ? { brandId: brand._id } : "skip")
+
+  const isLoading = brand === undefined || (brand !== null && products === undefined)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <DS2Spinner />
+      </div>
+    )
+  }
+
+  if (brand === null) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <p className="sb-body" style={{ color: "#6d8d9f" }}>Brand not found.</p>
+      </div>
+    )
+  }
+
+  const productList = products ?? []
+  const showEmpty = forceEmpty || productList.length === 0
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-32">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -203,14 +267,14 @@ export default function ProductsPage() {
           </p>
           <p className="mt-2">
             <span className="sb-data" style={{ color: "#d4dce2" }}>
-              {MOCK_PRODUCTS.length}
+              {productList.length}
             </span>
             <span className="sb-caption ml-2" style={{ color: "#6d8d9f" }}>
               products
             </span>
           </p>
         </div>
-        <AddProductDialog />
+        <AddProductDialog brandId={brand._id} />
       </div>
 
       {/* Product Grid Section */}
@@ -226,7 +290,6 @@ export default function ProductsPage() {
             cta={{
               label: "Add Product",
               onClick: () => {
-                // Trigger the dialog
                 const btn = document.querySelector('[data-add-product-trigger]') as HTMLButtonElement
                 btn?.click()
               },
@@ -235,9 +298,9 @@ export default function ProductsPage() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {MOCK_PRODUCTS.map((product, index) => (
+            {productList.map((product, index) => (
               <div
-                key={product.id}
+                key={product._id}
                 style={{
                   animation: "sb-card-enter 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
                   animationDelay: `${index * 60}ms`,

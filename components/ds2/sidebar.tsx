@@ -2,10 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useClerk } from "@clerk/nextjs"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   DashboardSquare01Icon,
-  AiChat02Icon,
   ShoppingBag01Icon,
   Image02Icon,
   Calendar03Icon,
@@ -13,10 +13,11 @@ import {
   Home01Icon,
   GridViewIcon,
   CreditCardIcon,
+  Link04Icon,
   Settings01Icon,
   Logout01Icon,
 } from "@hugeicons/core-free-icons"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Tooltip,
   TooltipContent,
@@ -45,17 +46,16 @@ interface AppSidebarProps {
   currentBrand: Brand | null
   onBrandChange: (brandSlug: string) => void
   user: DashboardUser
-  logosHasNotification?: boolean
   brandNavCounts?: BrandNavCounts
 }
 
 const BRAND_NAV_ITEMS = [
   { label: "Dashboard", icon: DashboardSquare01Icon, path: "" },
-  { label: "Logos", icon: AiChat02Icon, path: "/logos" },
   { label: "Products", icon: ShoppingBag01Icon, path: "/products", countKey: "products" as const },
   { label: "Studio", icon: Image02Icon, path: "/studio", countKey: "studio" as const },
   { label: "Scheduling", icon: Calendar03Icon, path: "/scheduling", countKey: "scheduling" as const },
   { label: "Analytics", icon: Analytics01Icon, path: "/analytics" },
+  { label: "Social Accounts", icon: Link04Icon, path: "/settings/social", countKey: "social" as const },
 ]
 
 const ACCOUNT_NAV_ITEMS = [
@@ -69,12 +69,12 @@ export function AppSidebar({
   currentBrand,
   onBrandChange,
   user,
-  logosHasNotification = false,
   brandNavCounts,
 }: AppSidebarProps) {
   const pathname = usePathname()
   const { state } = useSidebar()
   const collapsed = state === "collapsed"
+  const clerk = useClerk()
 
   return (
     <Sidebar side="left" collapsible="icon">
@@ -148,7 +148,6 @@ export function AppSidebar({
               }
 
               const count = item.countKey ? brandNavCounts?.[item.countKey] : undefined
-              const isLogos = item.label === "Logos"
 
               // Tooltip includes count when available
               const tooltipText = count !== undefined
@@ -165,12 +164,6 @@ export function AppSidebar({
                     <Link href={href}>
                       <span className="sb-icon-wrapper">
                         <HugeiconsIcon icon={item.icon} strokeWidth={2} />
-                        {isLogos && logosHasNotification && (
-                          <span
-                            className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 sb-pulse-dot"
-                            style={{ background: "#f4b964" }}
-                          />
-                        )}
                       </span>
                       <span>{item.label}</span>
                     </Link>
@@ -227,6 +220,9 @@ export function AppSidebar({
           <Tooltip>
             <TooltipTrigger asChild>
               <Avatar className="h-8 w-8 shrink-0">
+                {user.imageUrl && (
+                  <AvatarImage src={user.imageUrl} alt={user.name} />
+                )}
                 <AvatarFallback
                   style={{
                     background: "#163344",
@@ -273,6 +269,7 @@ export function AppSidebar({
                   color: "#6d8d9f",
                   transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
+                onClick={() => clerk.openUserProfile()}
               >
                 <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} className="size-4" />
               </button>

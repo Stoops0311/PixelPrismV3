@@ -8,7 +8,7 @@ import { formatDistanceToNow } from "date-fns"
 function LogosDigestCard({
   insightText,
   timestamp,
-  ctaLabel = "Chat with Logos",
+  ctaLabel = "View Insights",
   ctaHref,
 }: {
   insightText: string

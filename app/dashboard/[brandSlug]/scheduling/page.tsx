@@ -1,156 +1,126 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
+import { useParams, useSearchParams } from "next/navigation"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import {
-  format,
-  startOfWeek,
-  endOfWeek,
+  addMonths,
   addWeeks,
-  subWeeks,
   eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
   isSameDay,
   startOfMonth,
-  endOfMonth,
-  addMonths,
+  startOfWeek,
   subMonths,
+  subWeeks,
 } from "date-fns"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  InstagramIcon,
-  TiktokIcon,
-  Facebook02Icon,
+  Add01Icon,
+  AiChat02Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
-  Add01Icon,
+  Facebook02Icon,
   Image02Icon,
-  AiChat02Icon,
+  InstagramIcon,
+  Link04Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
   SheetDescription,
   SheetFooter,
+  SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
+  TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { showSuccess, showInfo } from "@/components/ds2/toast"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import { StudioImagePickerDialog } from "@/components/ds2/studio-image-picker-dialog"
+import { showInfo, showSuccess } from "@/components/ds2/toast"
 
-// ── Types ─────────────────────────────────────────────────────────────────
+type SupportedPlatform = "instagram" | "facebook" | "linkedin" | "pinterest"
+
+type CalendarStatus = "draft" | "scheduled" | "posted" | "failed"
 
 interface ScheduledPost {
   id: string
-  platforms: ("instagram" | "tiktok" | "facebook")[]
+  platforms: SupportedPlatform[]
   preview: string
-  scheduledAt: string // ISO 8601
-  status: "scheduled" | "posted" | "failed"
+  hashtags: string[]
+  scheduledAt: string
+  status: CalendarStatus
   imageGradient: string
+  imageId?: string
+  imageUrl?: string
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
+interface StudioImageChoice {
+  id: string
+  imageUrl?: string
+  prompt: string
+  aspectRatio: string
+  createdAt: number
+}
 
-const TODAY = new Date(2026, 1, 16) // Feb 16, 2026 (Monday start week)
+const TODAY = new Date()
 
-const PLATFORM_ICONS: Record<string, typeof InstagramIcon> = {
+const PLATFORM_ICONS: Record<SupportedPlatform, typeof InstagramIcon> = {
   instagram: InstagramIcon,
-  tiktok: TiktokIcon,
   facebook: Facebook02Icon,
+  linkedin: Link04Icon,
+  pinterest: Link04Icon,
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
+const PLATFORM_LABELS: Record<SupportedPlatform, string> = {
   instagram: "Instagram",
-  tiktok: "TikTok",
   facebook: "Facebook",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
 }
 
-const CONNECTED_ACCOUNTS = ["instagram", "tiktok", "facebook"] as const
+const ALL_PLATFORM_KEYS: SupportedPlatform[] = [
+  "instagram",
+  "facebook",
+  "linkedin",
+  "pinterest",
+]
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<CalendarStatus, string> = {
+  draft: "#6d8d9f",
   scheduled: "#e8956a",
   posted: "#a4f464",
   failed: "#e85454",
 }
 
-// ── Mock Data ─────────────────────────────────────────────────────────────
+const FALLBACK_GRADIENT = "linear-gradient(135deg, #163344, #0b2230)"
 
-const MOCK_POSTS: ScheduledPost[] = [
-  {
-    id: "p1",
-    platforms: ["instagram"],
-    preview: "New seasonal blend just dropped! Our Guatemala single-origin is perfect for...",
-    scheduledAt: "2026-02-10T09:00:00",
-    status: "posted",
-    imageGradient: "linear-gradient(135deg, #163344, #0b2230)",
-  },
-  {
-    id: "p2",
-    platforms: ["tiktok", "instagram"],
-    preview: "Behind the scenes at our roastery — watch the magic happen from green bean to...",
-    scheduledAt: "2026-02-11T14:30:00",
-    status: "posted",
-    imageGradient: "linear-gradient(135deg, #1a3a4f, #0e2838)",
-  },
-  {
-    id: "p3",
-    platforms: ["instagram"],
-    preview: "Rise and grind! Our morning pour-over ritual in 60 seconds. Save this for later...",
-    scheduledAt: "2026-02-12T07:00:00",
-    status: "posted",
-    imageGradient: "linear-gradient(135deg, #0e2838, #163344)",
-  },
-  {
-    id: "p4",
-    platforms: ["facebook"],
-    preview: "Community spotlight: Meet Sarah, our barista of the month who creates incredible...",
-    scheduledAt: "2026-02-13T11:00:00",
-    status: "posted",
-    imageGradient: "linear-gradient(135deg, #163344, #1a3a4f)",
-  },
-  {
-    id: "p5",
-    platforms: ["instagram", "facebook"],
-    preview: "Flash sale alert! 20% off all whole bean bags this weekend. Use code SUNRISE20...",
-    scheduledAt: "2026-02-14T10:00:00",
-    status: "failed",
-    imageGradient: "linear-gradient(135deg, #1a3a4f, #0b2230)",
-  },
-  {
-    id: "p6",
-    platforms: ["tiktok"],
-    preview: "3 latte art designs anyone can learn at home. Which one is your favorite? Comment...",
-    scheduledAt: "2026-02-14T16:00:00",
-    status: "posted",
-    imageGradient: "linear-gradient(135deg, #0b2230, #163344)",
-  },
-  {
-    id: "p7",
-    platforms: ["instagram"],
-    preview: "Weekend vibes at the cafe. Nothing beats a cold brew on a Saturday morning...",
-    scheduledAt: "2026-02-15T08:30:00",
-    status: "scheduled",
-    imageGradient: "linear-gradient(135deg, #163344, #0e2838)",
-  },
-  {
-    id: "p8",
-    platforms: ["instagram", "tiktok", "facebook"],
-    preview: "Big announcement coming tomorrow! Stay tuned for something special from Sunrise...",
-    scheduledAt: "2026-02-16T10:00:00",
-    status: "scheduled",
-    imageGradient: "linear-gradient(135deg, #0e2838, #1a3a4f)",
-  },
-]
+function normalizeHashtags(input: string): string[] {
+  const tags = input
+    .split(/[\s,]+/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .map((tag) => (tag.startsWith("#") ? tag.toLowerCase() : `#${tag.toLowerCase()}`))
 
-// ── PostCard ──────────────────────────────────────────────────────────────
+  return Array.from(new Set(tags))
+}
+
+function hashtagsToInput(hashtags?: string[]) {
+  return (hashtags || []).join(" ")
+}
 
 function PostCard({
   post,
@@ -179,7 +149,6 @@ function PostCard({
         animationDelay: `${index * 60}ms`,
       }}
     >
-      {/* Row 1: time + platform icons */}
       <div className="flex items-center justify-between mb-1.5">
         <span className="sb-data" style={{ fontSize: 11, color: "#6d8d9f" }}>
           {time}
@@ -187,36 +156,33 @@ function PostCard({
         <div className="flex items-center gap-1">
           {post.platforms.map((p) => {
             const iconDef = PLATFORM_ICONS[p]
-            return iconDef ? (
-              <HugeiconsIcon key={p} icon={iconDef} size={12} color="#6d8d9f" />
-            ) : null
+            return <HugeiconsIcon key={p} icon={iconDef} size={12} color="#6d8d9f" />
           })}
         </div>
       </div>
-      {/* Row 2: thumbnail + preview */}
+
       <div className="flex items-center gap-2">
         <div
-          className="sb-post-thumbnail shrink-0"
+          className="sb-post-thumbnail shrink-0 overflow-hidden"
           style={{
             width: 36,
             height: 36,
-            background: post.imageGradient,
+            background: post.imageUrl ? "#071a26" : post.imageGradient,
             border: "1px solid rgba(244,185,100,0.08)",
-            transition: "transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
-        />
-        <span
-          className="sb-body-sm line-clamp-1"
-          style={{ color: "#d4dce2" }}
         >
+          {post.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.imageUrl} alt="Post preview" className="w-full h-full object-cover" />
+          ) : null}
+        </div>
+        <span className="sb-body-sm line-clamp-1" style={{ color: "#d4dce2" }}>
           {post.preview}
         </span>
       </div>
     </button>
   )
 }
-
-// ── WeeklyCalendar ────────────────────────────────────────────────────────
 
 function WeeklyCalendar({
   weekStart,
@@ -235,23 +201,16 @@ function WeeklyCalendar({
   })
 
   return (
-    <div
-      className="grid grid-cols-7"
-      style={{ border: "1px solid rgba(244,185,100,0.12)" }}
-    >
+    <div className="grid grid-cols-7" style={{ border: "1px solid rgba(244,185,100,0.12)" }}>
       {days.map((day) => {
         const isToday = isSameDay(day, TODAY)
         const dayPosts = posts
           .filter((p) => isSameDay(new Date(p.scheduledAt), day))
-          .sort(
-            (a, b) =>
-              new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
-          )
+          .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
 
         return (
           <div
             key={day.toISOString()}
-            className="sb-calendar-day"
             style={{
               borderRight: "1px solid rgba(244,185,100,0.06)",
               borderLeft: isToday ? "3px solid #f4b964" : undefined,
@@ -259,60 +218,32 @@ function WeeklyCalendar({
               minHeight: 320,
             }}
           >
-            {/* Day header */}
             <div
               className="flex items-center justify-between px-3 py-2"
-              style={{
-                borderBottom: "1px solid rgba(244,185,100,0.06)",
-              }}
+              style={{ borderBottom: "1px solid rgba(244,185,100,0.06)" }}
             >
               <span className="sb-label" style={{ color: "#6d8d9f" }}>
                 {format(day, "EEE")}
               </span>
-              <span
-                className="sb-data"
-                style={{
-                  fontSize: 13,
-                  color: isToday ? "#f4b964" : "#eaeef1",
-                }}
-              >
+              <span className="sb-data" style={{ fontSize: 13, color: isToday ? "#f4b964" : "#eaeef1" }}>
                 {format(day, "d")}
               </span>
             </div>
 
-            {/* Posts */}
             <div className="p-2 space-y-2">
-              {dayPosts.length > 0 ? (
-                <>
-                  {dayPosts.map((post, i) => (
-                    <PostCard
-                      key={post.id}
-                      post={post}
-                      index={i}
-                      onClick={() => onPostClick(post)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    aria-label={`Add post on ${format(day, "EEEE, MMMM d")}`}
-                    onClick={() => onSlotClick(day)}
-                    className="sb-empty-slot w-full cursor-pointer flex items-center justify-center"
-                    style={{ height: 32 }}
-                  >
-                    <HugeiconsIcon icon={Add01Icon} size={14} color="rgba(244,185,100,0.20)" />
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={`Add post on ${format(day, "EEEE, MMMM d")}`}
-                  onClick={() => onSlotClick(day)}
-                  className="sb-empty-slot w-full cursor-pointer flex items-center justify-center"
-                  style={{ height: 60 }}
-                >
-                  <HugeiconsIcon icon={Add01Icon} size={16} color="rgba(244,185,100,0.14)" />
-                </button>
-              )}
+              {dayPosts.map((post, i) => (
+                <PostCard key={post.id} post={post} index={i} onClick={() => onPostClick(post)} />
+              ))}
+
+              <button
+                type="button"
+                aria-label={`Add post on ${format(day, "EEEE, MMMM d")}`}
+                onClick={() => onSlotClick(day)}
+                className="sb-empty-slot w-full cursor-pointer flex items-center justify-center"
+                style={{ height: dayPosts.length > 0 ? 32 : 60 }}
+              >
+                <HugeiconsIcon icon={Add01Icon} size={16} color="rgba(244,185,100,0.18)" />
+              </button>
             </div>
           </div>
         )
@@ -320,8 +251,6 @@ function WeeklyCalendar({
     </div>
   )
 }
-
-// ── MonthlyCalendar ───────────────────────────────────────────────────────
 
 function MonthlyCalendar({
   month,
@@ -340,41 +269,27 @@ function MonthlyCalendar({
 
   return (
     <div>
-      {/* Weekday headers */}
-      <div
-        className="grid grid-cols-7"
-        style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}
-      >
+      <div className="grid grid-cols-7" style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}>
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div key={d} className="px-3 py-2 text-center">
-            <span className="sb-label" style={{ color: "#6d8d9f" }}>
-              {d}
-            </span>
+            <span className="sb-label" style={{ color: "#6d8d9f" }}>{d}</span>
           </div>
         ))}
       </div>
 
-      {/* Day grid */}
-      <div
-        className="grid grid-cols-7"
-        style={{ border: "1px solid rgba(244,185,100,0.12)" }}
-      >
+      <div className="grid grid-cols-7" style={{ border: "1px solid rgba(244,185,100,0.12)" }}>
         {days.map((day) => {
           const isToday = isSameDay(day, TODAY)
           const isCurrentMonth =
-            day.getMonth() === month.getMonth() &&
-            day.getFullYear() === month.getFullYear()
-          const dayPosts = posts.filter((p) =>
-            isSameDay(new Date(p.scheduledAt), day)
-          )
+            day.getMonth() === month.getMonth() && day.getFullYear() === month.getFullYear()
+          const dayPosts = posts.filter((p) => isSameDay(new Date(p.scheduledAt), day))
 
           return (
             <button
               key={day.toISOString()}
               type="button"
               onClick={() => onDayClick(day)}
-              aria-label={`${format(day, "EEEE, MMMM d")} — ${dayPosts.length} post${dayPosts.length !== 1 ? "s" : ""}`}
-              className={`sb-month-cell text-left cursor-pointer ${isToday ? "sb-month-cell--today" : ""}`}
+              className="text-left cursor-pointer"
               style={{
                 borderRight: "1px solid rgba(244,185,100,0.06)",
                 borderBottom: "1px solid rgba(244,185,100,0.06)",
@@ -383,16 +298,10 @@ function MonthlyCalendar({
                 opacity: isCurrentMonth ? 1 : 0.4,
               }}
             >
-              <span
-                className="sb-data"
-                style={{
-                  fontSize: 12,
-                  color: isToday ? "#f4b964" : "#eaeef1",
-                }}
-              >
+              <span className="sb-data" style={{ fontSize: 12, color: isToday ? "#f4b964" : "#eaeef1" }}>
                 {format(day, "d")}
               </span>
-              {dayPosts.length > 0 && (
+              {dayPosts.length > 0 ? (
                 <div className="mt-1.5">
                   <div className="flex items-center gap-1">
                     {dayPosts.slice(0, 3).map((p) => (
@@ -407,15 +316,11 @@ function MonthlyCalendar({
                       />
                     ))}
                   </div>
-                  <span
-                    className="sb-caption"
-                    style={{ color: "#6d8d9f", marginTop: 2, display: "block" }}
-                  >
+                  <span className="sb-caption" style={{ color: "#6d8d9f", marginTop: 2, display: "block" }}>
                     {dayPosts.length} post{dayPosts.length !== 1 ? "s" : ""}
-                    {dayPosts.length > 3 && ` (+${dayPosts.length - 3} more)`}
                   </span>
                 </div>
-              )}
+              ) : null}
             </button>
           )
         })}
@@ -424,13 +329,13 @@ function MonthlyCalendar({
   )
 }
 
-// ── PostComposerSheet ─────────────────────────────────────────────────────
-
 function PostComposerSheet({
   open,
   onOpenChange,
   caption,
   onCaptionChange,
+  hashtags,
+  onHashtagsChange,
   date,
   onDateChange,
   time,
@@ -438,6 +343,11 @@ function PostComposerSheet({
   platforms,
   onPlatformToggle,
   selectedPost,
+  selectedImage,
+  onChooseImage,
+  studioImages,
+  connectedPlatforms,
+  brandSlug,
   onSchedule,
   onSaveDraft,
 }: {
@@ -445,65 +355,106 @@ function PostComposerSheet({
   onOpenChange: (open: boolean) => void
   caption: string
   onCaptionChange: (v: string) => void
+  hashtags: string
+  onHashtagsChange: (v: string) => void
   date: string
   onDateChange: (v: string) => void
   time: string
   onTimeChange: (v: string) => void
-  platforms: Record<string, boolean>
-  onPlatformToggle: (platform: string) => void
+  platforms: Record<SupportedPlatform, boolean>
+  onPlatformToggle: (platform: SupportedPlatform) => void
   selectedPost: ScheduledPost | null
+  selectedImage: StudioImageChoice | null
+  onChooseImage: (image: StudioImageChoice | null) => void
+  studioImages: StudioImageChoice[]
+  connectedPlatforms: SupportedPlatform[]
+  brandSlug: string
   onSchedule: () => void
   onSaveDraft: () => void
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
   const charLimit = 2200
-  const overLimit = caption.length > charLimit
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setPickerOpen(false)
+    onOpenChange(nextOpen)
+  }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="!w-[420px] !max-w-[420px] overflow-y-auto"
-      >
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetContent side="right" className="!w-[460px] !max-w-[460px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="sb-h3">
-            {selectedPost ? "Edit Post" : "New Post"}
-          </SheetTitle>
+          <SheetTitle className="sb-h3">{selectedPost ? "Edit Post" : "New Post"}</SheetTitle>
           <SheetDescription>
-            {selectedPost
-              ? "Update your scheduled post."
-              : "Compose and schedule a new post."}
+            {selectedPost ? "Update your scheduled post." : "Compose and schedule a new post."}
           </SheetDescription>
         </SheetHeader>
 
         <div className="px-6 py-4 space-y-5 flex-1">
-          {/* Image drop zone */}
           <div>
             <Label className="mb-2 block">Image</Label>
             <div
-              className="flex flex-col items-center justify-center gap-2 py-8"
+              className="p-3"
               style={{
-                border: "2px dashed rgba(244,185,100,0.12)",
+                border: "1px dashed rgba(244,185,100,0.2)",
                 background: "rgba(244,185,100,0.02)",
               }}
             >
-              <HugeiconsIcon icon={Image02Icon} size={28} color="#6d8d9f" />
-              <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>
-                Drag an image here
-              </span>
-              <Button className="sb-btn-ghost !py-1 !px-3 !min-h-[32px] !text-xs">
-                Choose from Studio
-              </Button>
+              {selectedImage?.imageUrl ? (
+                <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedImage.imageUrl}
+                    alt="Selected"
+                    className="w-full h-48 object-cover border border-[rgba(244,185,100,0.12)]"
+                  />
+                  {selectedImage.prompt && (
+                    <p className="sb-body-sm truncate" style={{ color: "#8fa8b8" }}>
+                      {selectedImage.prompt}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    {selectedImage.aspectRatio && (
+                      <span className="sb-data" style={{ fontSize: 11, color: "#6d8d9f" }}>
+                        {selectedImage.aspectRatio}
+                      </span>
+                    )}
+                    <div className="flex gap-2 ml-auto">
+                      <Button className="sb-btn-ghost !min-h-[34px] !px-3 !text-xs" onClick={() => setPickerOpen(true)}>
+                        Change
+                      </Button>
+                      <Button className="sb-btn-secondary !min-h-[34px] !px-3 !text-xs" onClick={() => onChooseImage(null)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-8">
+                  <HugeiconsIcon icon={Image02Icon} size={28} color="#6d8d9f" />
+                  <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+                    No image selected
+                  </span>
+                  <Button className="sb-btn-secondary !py-1 !px-3 !min-h-[32px] !text-xs" onClick={() => setPickerOpen(true)}>
+                    Browse Studio
+                  </Button>
+                </div>
+              )}
             </div>
+
+            <StudioImagePickerDialog
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              images={studioImages}
+              selectedImageId={selectedImage?.id}
+              onSelect={onChooseImage}
+            />
           </div>
 
-          {/* Caption */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>Caption</Label>
-              <span
-                className="sb-data"
-                style={{ fontSize: 11, color: overLimit ? "#e8956a" : "#6d8d9f" }}
-              >
+              <span className="sb-data" style={{ fontSize: 11, color: caption.length > charLimit ? "#e8956a" : "#6d8d9f" }}>
                 {caption.length}/{charLimit.toLocaleString()}
               </span>
             </div>
@@ -515,56 +466,68 @@ function PostComposerSheet({
             />
           </div>
 
-          {/* Platform selector */}
           <div>
-            <Label className="mb-2 block">Platforms</Label>
-            <div className="space-y-2">
-              {CONNECTED_ACCOUNTS.map((platform) => {
-                const iconDef = PLATFORM_ICONS[platform]
-                return (
-                  <label
-                    key={platform}
-                    className={`sb-field-card flex items-center gap-3 !p-3 cursor-pointer ${
-                      platforms[platform] ? "sb-field-card--selected" : ""
-                    }`}
-                  >
-                    <Checkbox
-                      checked={platforms[platform] || false}
-                      onCheckedChange={() => onPlatformToggle(platform)}
-                    />
-                    {iconDef && (
-                      <HugeiconsIcon icon={iconDef} size={18} color="#6d8d9f" />
-                    )}
-                    <span className="sb-body-sm" style={{ color: "#d4dce2" }}>
-                      {PLATFORM_LABELS[platform]}
-                    </span>
-                  </label>
-                )
-              })}
-            </div>
+            <Label className="mb-2 block">Hashtags (stored separately)</Label>
+            <Input
+              placeholder="#launch #newdrop #sale"
+              value={hashtags}
+              onChange={(e) => onHashtagsChange(e.target.value)}
+            />
           </div>
 
-          {/* Date + Time */}
+          <div>
+            <Label className="mb-2 block">Platforms</Label>
+            {connectedPlatforms.length > 0 ? (
+              <div className="space-y-2">
+                {connectedPlatforms.map((platform) => {
+                  const iconDef = PLATFORM_ICONS[platform]
+                  return (
+                    <label
+                      key={platform}
+                      className={`sb-field-card flex items-center gap-3 !p-3 cursor-pointer ${
+                        platforms[platform] ? "sb-field-card--selected" : ""
+                      }`}
+                    >
+                      <Checkbox checked={platforms[platform]} onCheckedChange={() => onPlatformToggle(platform)} />
+                      <HugeiconsIcon icon={iconDef} size={18} color="#6d8d9f" />
+                      <span className="sb-body-sm" style={{ color: "#d4dce2" }}>{PLATFORM_LABELS[platform]}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <div
+                className="p-4 text-center"
+                style={{
+                  border: "1px dashed rgba(244, 185, 100, 0.15)",
+                  background: "rgba(244, 185, 100, 0.02)",
+                }}
+              >
+                <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+                  No platforms connected yet.
+                </p>
+                <a
+                  href={`/dashboard/${brandSlug}/settings/social`}
+                  className="sb-caption mt-1 inline-block hover:underline"
+                  style={{ color: "#f4b964" }}
+                >
+                  Connect a platform
+                </a>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-2 block">Date</Label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => onDateChange(e.target.value)}
-              />
+              <Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} />
             </div>
             <div>
               <Label className="mb-2 block">Time</Label>
-              <Input
-                type="time"
-                value={time}
-                onChange={(e) => onTimeChange(e.target.value)}
-              />
+              <Input type="time" value={time} onChange={(e) => onTimeChange(e.target.value)} />
             </div>
           </div>
 
-          {/* Logos suggestion placeholder */}
           <div
             className="flex items-start gap-3 p-4"
             style={{
@@ -572,22 +535,11 @@ function PostComposerSheet({
               border: "1px solid rgba(244,185,100,0.08)",
             }}
           >
-            <HugeiconsIcon
-              icon={AiChat02Icon}
-              size={20}
-              color="#f4b964"
-              className="shrink-0 mt-0.5"
-            />
+            <HugeiconsIcon icon={AiChat02Icon} size={20} color="#f4b964" className="shrink-0 mt-0.5" />
             <div>
-              <span className="sb-label" style={{ color: "#f4b964" }}>
-                Logos Suggestion
-              </span>
-              <p
-                className="sb-body-sm mt-1"
-                style={{ color: "#6d8d9f" }}
-              >
-                Start typing your caption (10+ characters) and Logos will suggest
-                on-brand rewrites after a short pause.
+              <span className="sb-label" style={{ color: "#f4b964" }}>AI Suggestion</span>
+              <p className="sb-body-sm mt-1" style={{ color: "#6d8d9f" }}>
+                Caption and hashtags are manual for now. AI assist can be layered in later.
               </p>
             </div>
           </div>
@@ -606,44 +558,137 @@ function PostComposerSheet({
   )
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────
-
 export default function SchedulingPage() {
-  const [viewMode, setViewMode] = useState<"week" | "month">("week")
-  const [currentWeekStart, setCurrentWeekStart] = useState(
-    startOfWeek(TODAY, { weekStartsOn: 1 })
+  const params = useParams()
+  const searchParams = useSearchParams()
+  const brandSlug = params.brandSlug as string
+  const queryImageId = searchParams.get("imageId")
+  const queryImageUrl = searchParams.get("imageUrl")
+
+  const queryImageSelection: StudioImageChoice | null =
+    queryImageId || queryImageUrl
+      ? {
+          id: queryImageId || queryImageUrl || "query-image",
+          imageUrl: queryImageUrl || undefined,
+          prompt: "",
+          aspectRatio: "1:1",
+          createdAt: 0,
+        }
+      : null
+
+  const brand = useQuery(api.brands.getBySlug, { slug: brandSlug })
+  const connectedAccounts = useQuery(
+    api.socialAccounts.listConnectedByBrand,
+    brand ? { brandId: brand._id } : "skip"
   )
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 1, 1))
-  const [composerOpen, setComposerOpen] = useState(false)
+  const scheduledPosts = useQuery(
+    api.scheduledPosts.listByBrand,
+    brand ? { brandId: brand._id } : "skip"
+  )
+  const studioImagesRaw = useQuery(
+    api.images.listByBrand,
+    brand ? { brandId: brand._id, status: "ready", limit: 60 } : "skip"
+  )
+
+  const createScheduledPost = useMutation(api.scheduledPosts.create)
+  const saveDraftPost = useMutation(api.scheduledPosts.saveDraft)
+  const updateScheduledPost = useMutation(api.scheduledPosts.update)
+
+  const [viewMode, setViewMode] = useState<"week" | "month">("week")
+  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(TODAY, { weekStartsOn: 1 }))
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(TODAY))
+  const [composerOpen, setComposerOpen] = useState(Boolean(queryImageSelection))
+
   const [composerCaption, setComposerCaption] = useState("")
-  const [composerDate, setComposerDate] = useState("")
-  const [composerTime, setComposerTime] = useState("")
-  const [composerPlatforms, setComposerPlatforms] = useState<
-    Record<string, boolean>
-  >({ instagram: false, tiktok: false, facebook: false })
+  const [composerHashtags, setComposerHashtags] = useState("")
+  const [composerDate, setComposerDate] = useState(
+    queryImageSelection ? format(TODAY, "yyyy-MM-dd") : ""
+  )
+  const [composerTime, setComposerTime] = useState(queryImageSelection ? "09:00" : "")
+  const [composerPlatforms, setComposerPlatforms] = useState<Record<SupportedPlatform, boolean>>({
+    instagram: false,
+    facebook: false,
+    linkedin: false,
+    pinterest: false,
+  })
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
+  const [selectedImage, setSelectedImage] = useState<StudioImageChoice | null>(
+    queryImageSelection
+  )
   const [navDirection, setNavDirection] = useState<"forward" | "back">("forward")
   const [navKey, setNavKey] = useState(0)
 
-  // Navigation
+  const studioImages: StudioImageChoice[] = useMemo(
+    () =>
+      (studioImagesRaw || []).map((img) => ({
+        id: String(img._id),
+        imageUrl: img.imageUrl,
+        prompt: img.prompt ?? "",
+        aspectRatio: img.aspectRatio ?? "1:1",
+        createdAt: img.createdAt,
+      })),
+    [studioImagesRaw]
+  )
+
+  const connectedPlatformKeys = useMemo(() => {
+    const set = new Set<SupportedPlatform>()
+    for (const account of connectedAccounts ?? []) {
+      set.add(account.platform as SupportedPlatform)
+    }
+    return Array.from(set)
+  }, [connectedAccounts])
+
+  const calendarPosts: ScheduledPost[] = useMemo(() => {
+    if (!scheduledPosts) return []
+
+    return scheduledPosts.map((post) => ({
+      id: String(post._id),
+      platforms: post.selectedPlatforms as SupportedPlatform[],
+      preview: post.caption,
+      hashtags: post.hashtags || [],
+      scheduledAt: new Date(post.scheduledFor || post.createdAt).toISOString(),
+      status:
+        post.status === "draft"
+          ? "draft"
+          : post.status === "published"
+            ? "posted"
+            : post.status === "failed"
+              ? "failed"
+              : "scheduled",
+      imageGradient: FALLBACK_GRADIENT,
+      imageId: post.imageId ? String(post.imageId) : undefined,
+      imageUrl: post.imageUrl,
+    }))
+  }, [scheduledPosts])
+
+  if (brand === undefined || connectedAccounts === undefined || scheduledPosts === undefined || studioImagesRaw === undefined) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <DS2Spinner />
+      </div>
+    )
+  }
+
+  if (!brand) {
+    return (
+      <div>
+        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Brand not found</h1>
+      </div>
+    )
+  }
+
   const navigateBack = () => {
     setNavDirection("back")
     setNavKey((k) => k + 1)
-    if (viewMode === "week") {
-      setCurrentWeekStart((prev) => subWeeks(prev, 1))
-    } else {
-      setCurrentMonth((prev) => subMonths(prev, 1))
-    }
+    if (viewMode === "week") setCurrentWeekStart((prev) => subWeeks(prev, 1))
+    else setCurrentMonth((prev) => subMonths(prev, 1))
   }
 
   const navigateForward = () => {
     setNavDirection("forward")
     setNavKey((k) => k + 1)
-    if (viewMode === "week") {
-      setCurrentWeekStart((prev) => addWeeks(prev, 1))
-    } else {
-      setCurrentMonth((prev) => addMonths(prev, 1))
-    }
+    if (viewMode === "week") setCurrentWeekStart((prev) => addWeeks(prev, 1))
+    else setCurrentMonth((prev) => addMonths(prev, 1))
   }
 
   const goToday = () => {
@@ -653,70 +698,197 @@ export default function SchedulingPage() {
     setCurrentMonth(startOfMonth(TODAY))
   }
 
-  // Date range label
-  const dateLabel = useMemo(() => {
-    if (viewMode === "week") {
-      const end = endOfWeek(currentWeekStart, { weekStartsOn: 1 })
-      return `${format(currentWeekStart, "MMM d")} \u2013 ${format(end, "d, yyyy")}`
-    }
-    return format(currentMonth, "MMMM yyyy")
-  }, [viewMode, currentWeekStart, currentMonth])
+  const dateLabel =
+    viewMode === "week"
+      ? `${format(currentWeekStart, "MMM d")} - ${format(
+          endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
+          "d, yyyy"
+        )}`
+      : format(currentMonth, "MMMM yyyy")
 
-  // Open composer helpers
   const openNewPost = () => {
     setSelectedPost(null)
     setComposerCaption("")
+    setComposerHashtags("")
     setComposerDate("")
     setComposerTime("")
-    setComposerPlatforms({ instagram: false, tiktok: false, facebook: false })
+    setComposerPlatforms({ instagram: false, facebook: false, linkedin: false, pinterest: false })
+    setSelectedImage(queryImageSelection)
     setComposerOpen(true)
   }
 
   const openComposerForDate = (date: Date) => {
     setSelectedPost(null)
     setComposerCaption("")
+    setComposerHashtags("")
     setComposerDate(format(date, "yyyy-MM-dd"))
     setComposerTime("09:00")
-    setComposerPlatforms({ instagram: false, tiktok: false, facebook: false })
+    setComposerPlatforms({ instagram: false, facebook: false, linkedin: false, pinterest: false })
+    setSelectedImage(queryImageSelection)
     setComposerOpen(true)
   }
 
   const openComposerForPost = (post: ScheduledPost) => {
     setSelectedPost(post)
     setComposerCaption(post.preview)
+    setComposerHashtags(hashtagsToInput(post.hashtags))
     const d = new Date(post.scheduledAt)
     setComposerDate(format(d, "yyyy-MM-dd"))
     setComposerTime(format(d, "HH:mm"))
-    const plats: Record<string, boolean> = {
+
+    const plats: Record<SupportedPlatform, boolean> = {
       instagram: false,
-      tiktok: false,
       facebook: false,
+      linkedin: false,
+      pinterest: false,
     }
     post.platforms.forEach((p) => {
       plats[p] = true
     })
     setComposerPlatforms(plats)
+
+    const linkedStudioImage = post.imageId
+      ? studioImages.find((img) => img.id === post.imageId)
+      : undefined
+
+    setSelectedImage(
+      linkedStudioImage ||
+        (post.imageUrl
+          ? {
+              id: post.imageId || `post-${post.id}`,
+              imageUrl: post.imageUrl,
+              prompt: "",
+              aspectRatio: "1:1",
+              createdAt: Date.now(),
+            }
+          : null)
+    )
     setComposerOpen(true)
   }
 
-  const togglePlatform = (platform: string) => {
-    setComposerPlatforms((prev) => ({
-      ...prev,
-      [platform]: !prev[platform],
-    }))
+  const togglePlatform = (platform: SupportedPlatform) => {
+    setComposerPlatforms((prev) => ({ ...prev, [platform]: !prev[platform] }))
   }
 
-  const handleSchedule = () => {
-    setComposerOpen(false)
-    showSuccess("Post scheduled", "Your post has been added to the calendar.")
+  const getSelectedPlatforms = () =>
+    Object.entries(composerPlatforms)
+      .filter(([, enabled]) => enabled)
+      .map(([platform]) => platform as SupportedPlatform)
+
+  const buildAccountIdsForPlatforms = (platforms: SupportedPlatform[]) =>
+    (connectedAccounts ?? [])
+      .filter((acc) => platforms.includes(acc.platform as SupportedPlatform))
+      .map((acc) => acc._id)
+
+  const handleSchedule = async () => {
+    const selectedPlatforms = getSelectedPlatforms()
+    if (selectedPlatforms.length === 0) {
+      showInfo("No platforms selected", "Choose at least one platform")
+      return
+    }
+
+    if (!composerDate || !composerTime) {
+      showInfo("Schedule required", "Pick a date and time before scheduling")
+      return
+    }
+
+    const selectedAccountIds = buildAccountIdsForPlatforms(selectedPlatforms)
+    if (selectedAccountIds.length === 0) {
+      showInfo("No connected accounts", "Connect accounts for selected platforms first")
+      return
+    }
+
+    const scheduledFor = new Date(`${composerDate}T${composerTime}:00`).getTime()
+    const hashtags = normalizeHashtags(composerHashtags)
+    const selectedImageId =
+      selectedImage && studioImages.some((img) => img.id === selectedImage.id)
+        ? (selectedImage.id as Id<"generatedImages">)
+        : undefined
+
+    try {
+      if (selectedPost) {
+        await updateScheduledPost({
+          scheduledPostId: selectedPost.id as Id<"scheduledPosts">,
+          caption: composerCaption,
+          hashtags,
+          imageId: selectedImageId,
+          imageUrl: selectedImage?.imageUrl,
+          socialAccountIds: selectedAccountIds,
+          selectedPlatforms,
+          timezone: brand.timezone,
+          scheduledFor,
+          asDraft: false,
+        })
+        showSuccess("Post updated", "Your post has been updated and rescheduled")
+      } else {
+        await createScheduledPost({
+          brandId: brand._id,
+          caption: composerCaption,
+          hashtags,
+          imageId: selectedImageId,
+          imageUrl: selectedImage?.imageUrl,
+          socialAccountIds: selectedAccountIds,
+          selectedPlatforms,
+          timezone: brand.timezone,
+          scheduledFor,
+        })
+        showSuccess("Post scheduled", "Your post has been added to the calendar")
+      }
+
+      setComposerOpen(false)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to schedule post"
+      showInfo("Schedule failed", message)
+    }
   }
 
-  const handleSaveDraft = () => {
-    setComposerOpen(false)
-    showInfo("Draft saved", "Your draft has been saved for later.")
+  const handleSaveDraft = async () => {
+    const selectedPlatforms = getSelectedPlatforms()
+    const selectedAccountIds = buildAccountIdsForPlatforms(selectedPlatforms)
+    const hashtags = normalizeHashtags(composerHashtags)
+    const selectedImageId =
+      selectedImage && studioImages.some((img) => img.id === selectedImage.id)
+        ? (selectedImage.id as Id<"generatedImages">)
+        : undefined
+
+    try {
+      if (selectedPost) {
+        await updateScheduledPost({
+          scheduledPostId: selectedPost.id as Id<"scheduledPosts">,
+          caption: composerCaption || "Untitled draft",
+          hashtags,
+          imageId: selectedImageId,
+          imageUrl: selectedImage?.imageUrl,
+          socialAccountIds: selectedAccountIds,
+          selectedPlatforms,
+          timezone: brand.timezone,
+          scheduledFor:
+            composerDate && composerTime
+              ? new Date(`${composerDate}T${composerTime}:00`).getTime()
+              : undefined,
+          asDraft: true,
+        })
+      } else {
+        await saveDraftPost({
+          brandId: brand._id,
+          caption: composerCaption || "Untitled draft",
+          hashtags,
+          imageId: selectedImageId,
+          imageUrl: selectedImage?.imageUrl,
+          socialAccountIds: selectedAccountIds,
+          selectedPlatforms,
+          timezone: brand.timezone,
+        })
+      }
+
+      setComposerOpen(false)
+      showInfo("Draft saved", "Your draft has been saved for later")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to save draft"
+      showInfo("Save failed", message)
+    }
   }
 
-  // Month day click -> switch to weekly view
   const handleMonthDayClick = (day: Date) => {
     setNavDirection("forward")
     setNavKey((k) => k + 1)
@@ -725,24 +897,20 @@ export default function SchedulingPage() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* ── Header ────────────────────────────────────────────────── */}
+    <div className="space-y-32">
       <div className="flex items-start justify-between">
         <div>
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Content Calendar</p>
-          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
-            Scheduling
-          </h1>
+          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Scheduling</h1>
           <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
             Plan and schedule content across your platforms.
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Connected accounts */}
           <div className="flex items-center gap-2">
-            {CONNECTED_ACCOUNTS.map((platform) => {
+            {(connectedPlatformKeys.length ? connectedPlatformKeys : ALL_PLATFORM_KEYS).map((platform) => {
               const iconDef = PLATFORM_ICONS[platform]
-              return iconDef ? (
+              return (
                 <Tooltip key={platform}>
                   <TooltipTrigger asChild>
                     <span
@@ -762,7 +930,7 @@ export default function SchedulingPage() {
                     <p>{PLATFORM_LABELS[platform]} connected</p>
                   </TooltipContent>
                 </Tooltip>
-              ) : null
+              )
             })}
           </div>
           <Button className="sb-btn-primary" onClick={openNewPost}>
@@ -772,26 +940,16 @@ export default function SchedulingPage() {
         </div>
       </div>
 
-      {/* ── Controls bar ──────────────────────────────────────────── */}
-      <div
-        className="flex items-center justify-between pb-5"
-        style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}
-      >
-        {/* Left: view toggle */}
+      <div className="flex items-center justify-between pb-5" style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}>
         <ToggleGroup
           type="single"
           value={viewMode}
           onValueChange={(val) => val && setViewMode(val as "week" | "month")}
         >
-          <ToggleGroupItem value="week" style={{ padding: "8px 16px" }}>
-            Week
-          </ToggleGroupItem>
-          <ToggleGroupItem value="month" style={{ padding: "8px 16px" }}>
-            Month
-          </ToggleGroupItem>
+          <ToggleGroupItem value="week" style={{ padding: "8px 16px" }}>Week</ToggleGroupItem>
+          <ToggleGroupItem value="month" style={{ padding: "8px 16px" }}>Month</ToggleGroupItem>
         </ToggleGroup>
 
-        {/* Center: navigation */}
         <div className="flex items-center gap-3">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -807,12 +965,11 @@ export default function SchedulingPage() {
               <p>{viewMode === "week" ? "Previous week" : "Previous month"}</p>
             </TooltipContent>
           </Tooltip>
-          <span
-            className="sb-data"
-            style={{ color: "#eaeef1", minWidth: 220, textAlign: "center" }}
-          >
+
+          <span className="sb-data" style={{ color: "#eaeef1", minWidth: 220, textAlign: "center" }}>
             {dateLabel}
           </span>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -829,13 +986,11 @@ export default function SchedulingPage() {
           </Tooltip>
         </div>
 
-        {/* Right: today button */}
         <Button className="sb-btn-secondary !py-2 !px-4 !min-h-[36px] !text-xs" onClick={goToday}>
           Today
         </Button>
       </div>
 
-      {/* ── Calendar ──────────────────────────────────────────────── */}
       <div
         key={`${viewMode}-${navKey}`}
         style={{
@@ -845,25 +1000,22 @@ export default function SchedulingPage() {
         {viewMode === "week" ? (
           <WeeklyCalendar
             weekStart={currentWeekStart}
-            posts={MOCK_POSTS}
+            posts={calendarPosts}
             onSlotClick={openComposerForDate}
             onPostClick={openComposerForPost}
           />
         ) : (
-          <MonthlyCalendar
-            month={currentMonth}
-            posts={MOCK_POSTS}
-            onDayClick={handleMonthDayClick}
-          />
+          <MonthlyCalendar month={currentMonth} posts={calendarPosts} onDayClick={handleMonthDayClick} />
         )}
       </div>
 
-      {/* ── Composer Sheet ────────────────────────────────────────── */}
       <PostComposerSheet
         open={composerOpen}
         onOpenChange={setComposerOpen}
         caption={composerCaption}
         onCaptionChange={setComposerCaption}
+        hashtags={composerHashtags}
+        onHashtagsChange={setComposerHashtags}
         date={composerDate}
         onDateChange={setComposerDate}
         time={composerTime}
@@ -871,6 +1023,11 @@ export default function SchedulingPage() {
         platforms={composerPlatforms}
         onPlatformToggle={togglePlatform}
         selectedPost={selectedPost}
+        selectedImage={selectedImage}
+        onChooseImage={setSelectedImage}
+        studioImages={studioImages.filter((img) => !!img.imageUrl)}
+        connectedPlatforms={connectedPlatformKeys}
+        brandSlug={params.brandSlug as string}
         onSchedule={handleSchedule}
         onSaveDraft={handleSaveDraft}
       />

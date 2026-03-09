@@ -67,6 +67,20 @@
 Dashboard pages follow: coral `sb-label` overline -> `sb-h3` heading -> `mb-6` -> content.
 Example from `app/dashboard/page.tsx`: "Portfolio" / "Your Brands", "AI Insights" / etc.
 
+## Multi-Step Dialog Pattern (from Brand Creation)
+- Two steps max for creation flows -- feels conversational, not like a form
+- Step indicator: 2px progress bar segments (gold filled / muted unfilled), NOT numbered stepper
+- Step transitions use existing `sb-step-in` / `sb-step-back` keyframes (slide + fade)
+- Use `key={step}` on wrapper div to trigger CSS animation on mount
+- Track `animationDirection: 'forward' | 'back'` state for correct slide direction
+- Footer buttons slide WITH step content (not fixed) -- whole step animates as unit
+- "Continue" button activation: animate from disabled to enabled with `opacity + translateY(-1px)` settle
+- Success state: brief "Done" flash (600ms) before dialog auto-closes, then `sb-card-enter` on new item
+- All step state preserved on back navigation -- never reset fields
+- Smart defaults mean Step 2 "Create" button enabled immediately (no forced interaction)
+- Dialog width for multi-step: `sm:max-w-lg` (512px, wider than default `sm:max-w-sm`)
+- Logos mark presence (12x12, 60% opacity) in dialog headers for AI-connected flows
+
 ## Product Pages Audit
 - See `docs/product-pages-ux-redesign.md` for full audit and fix spec
 - 28 diagnosed problems, 16 specific fixes

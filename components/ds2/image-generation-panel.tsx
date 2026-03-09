@@ -8,6 +8,7 @@ import {
   ArrowRight02Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -22,21 +23,22 @@ import type { Product, GeneratedImage, GenerationConfig } from "@/types/dashboar
 // ── Style options ───────────────────────────────────────────────────────
 
 const STYLE_OPTIONS = [
-  { id: "product-shot", label: "Product Shot", gradient: "linear-gradient(135deg, #2a3a4a, #1a2a3a)" },
-  { id: "lifestyle", label: "Lifestyle", gradient: "linear-gradient(135deg, #3a4a2a, #2a3a1a)" },
-  { id: "flat-lay", label: "Flat Lay", gradient: "linear-gradient(135deg, #4a3a2a, #3a2a1a)" },
-  { id: "abstract", label: "Abstract", gradient: "linear-gradient(135deg, #3a2a4a, #2a1a3a)" },
+  { id: "none", label: "None", gradient: "linear-gradient(135deg, #1a2530, #0d1a24)", promptSuffix: "" },
+  { id: "product-shot", label: "Product Shot", gradient: "linear-gradient(135deg, #2a3a4a, #1a2a3a)", promptSuffix: ", professional product photography, studio lighting, clean background, high detail, commercial quality, sharp focus" },
+  { id: "lifestyle", label: "Lifestyle", gradient: "linear-gradient(135deg, #3a4a2a, #2a3a1a)", promptSuffix: ", lifestyle photography, natural lighting, soft focus, warm tones, cozy atmosphere, candid feel" },
+  { id: "flat-lay", label: "Flat Lay", gradient: "linear-gradient(135deg, #4a3a2a, #3a2a1a)", promptSuffix: ", flat lay photography, top-down view, organized arrangement, minimalist composition, clean styling" },
+  { id: "abstract", label: "Abstract", gradient: "linear-gradient(135deg, #3a2a4a, #2a1a3a)", promptSuffix: ", abstract art style, vibrant colors, geometric shapes, artistic interpretation, creative composition" },
 ]
 
 const QUALITY_OPTIONS = [
-  { id: "standard" as const, label: "Std", cost: 1 },
-  { id: "hd" as const, label: "HD", cost: 3 },
-  { id: "ultra" as const, label: "Ultra", cost: 5 },
+  { id: "standard" as const, label: "Standard", cost: 0.5 },
+  { id: "hd" as const, label: "HD", cost: 1 },
+  { id: "ultra" as const, label: "Ultra", cost: 1.5 },
 ]
 
-const ASPECT_OPTIONS = ["1:1", "4:5", "16:9", "9:16"] as const
+const ASPECT_OPTIONS = ["1:1", "9:16", "16:9", "3:4", "4:3", "3:2"] as const
 
-const QUALITY_COSTS: Record<string, number> = { standard: 1, hd: 3, ultra: 5 }
+const QUALITY_COSTS: Record<string, number> = { standard: 0.5, hd: 1, ultra: 1.5 }
 
 // ── Component ───────────────────────────────────────────────────────────
 
@@ -66,9 +68,10 @@ export function ImageGenerationPanel({
   const [selectedProductId, setSelectedProductId] = useState<string>(
     preSelectedProduct?.id ?? "none"
   )
-  const [selectedStyle, setSelectedStyle] = useState("product-shot")
+  const [prompt, setPrompt] = useState("")
+  const [selectedStyle, setSelectedStyle] = useState("none")
   const [quality, setQuality] = useState<"standard" | "hd" | "ultra">("hd")
-  const [aspectRatio, setAspectRatio] = useState<"1:1" | "4:5" | "16:9" | "9:16">("1:1")
+  const [aspectRatio, setAspectRatio] = useState<typeof ASPECT_OPTIONS[number]>("1:1")
   const [quantity, setQuantity] = useState(4)
   const [isDragOver, setIsDragOver] = useState(false)
   const [flashStyle, setFlashStyle] = useState<string | null>(null)
@@ -76,6 +79,7 @@ export function ImageGenerationPanel({
   const [referenceGlow, setReferenceGlow] = useState(false)
   const dropZoneHintRef = useRef(false)
   const prevCostRef = useRef(0)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Pre-select product from URL
   useEffect(() => {
@@ -83,6 +87,14 @@ export function ImageGenerationPanel({
       setSelectedProductId(preSelectedProduct.id)
     }
   }, [preSelectedProduct])
+
+  // Auto-grow textarea
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = Math.max(100, el.scrollHeight) + "px"
+  }, [prompt])
 
   // Cost calculation
   const totalCost = QUALITY_COSTS[quality] * quantity
@@ -101,22 +113,32 @@ export function ImageGenerationPanel({
 
   // Style card selection with flash
   const handleStyleSelect = useCallback((styleId: string) => {
+    // Toggle: clicking already-selected style deselects to "none"
+    if (styleId === selectedStyle && styleId !== "none") {
+      setSelectedStyle("none")
+      return
+    }
     setSelectedStyle(styleId)
     setFlashStyle(styleId)
     setTimeout(() => setFlashStyle(null), 300)
-  }, [])
+  }, [selectedStyle])
+
+  // Get the prompt suffix for the selected style
+  const selectedStyleOption = STYLE_OPTIONS.find((s) => s.id === selectedStyle)
 
   // Generate
   const handleGenerate = useCallback(() => {
     onGenerate({
+      prompt,
       style: selectedStyle,
+      stylePreset: selectedStyleOption?.promptSuffix ?? "",
       quality,
       aspectRatio,
       quantity,
       productId: selectedProductId === "none" ? undefined : selectedProductId,
       referenceImageId: referenceImage?.id,
     })
-  }, [selectedStyle, quality, aspectRatio, quantity, selectedProductId, referenceImage, onGenerate])
+  }, [prompt, selectedStyle, selectedStyleOption, quality, aspectRatio, quantity, selectedProductId, referenceImage, onGenerate])
 
   // Drop zone handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -149,6 +171,74 @@ export function ImageGenerationPanel({
         Generate
       </h3>
 
+      {/* Prompt — front and center */}
+      <div>
+        <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
+          Prompt
+        </label>
+        <Textarea
+          ref={textareaRef}
+          placeholder="Describe the image you want to generate..."
+          className="min-h-[100px]"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          style={{ resize: "none", overflow: "hidden" }}
+        />
+      </div>
+
+      {/* Style selector (optional — defaults to None) */}
+      <div>
+        <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
+          Style (optional)
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {STYLE_OPTIONS.filter((s) => s.id !== "none").map((style) => {
+            const isSelected = selectedStyle === style.id
+            const isFlashing = flashStyle === style.id
+            return (
+              <button
+                key={style.id}
+                onClick={() => handleStyleSelect(style.id)}
+                className="text-left cursor-pointer"
+                style={{
+                  border: `1px solid ${
+                    isSelected
+                      ? "rgba(244,185,100,0.22)"
+                      : "rgba(244,185,100,0.12)"
+                  }`,
+                  background: isSelected
+                    ? "rgba(244,185,100,0.04)"
+                    : "rgba(255,255,255,0.02)",
+                  padding: 8,
+                  transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  animation: isFlashing
+                    ? "sb-style-flash 300ms cubic-bezier(0.34, 1.56, 0.64, 1)"
+                    : undefined,
+                }}
+              >
+                <div
+                  style={{
+                    height: 48,
+                    background: style.gradient,
+                    marginBottom: 6,
+                    border: "1px solid rgba(244,185,100,0.06)",
+                  }}
+                />
+                <span
+                  className="sb-caption"
+                  style={{ color: isSelected ? "#eaeef1" : "#6d8d9f" }}
+                >
+                  {style.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div style={{ height: 1, background: "rgba(244,185,100,0.08)" }} />
+
       {/* Product selector */}
       <div>
         <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
@@ -180,9 +270,6 @@ export function ImageGenerationPanel({
         </Select>
       </div>
 
-      {/* Separator */}
-      <div style={{ height: 1, background: "rgba(244,185,100,0.08)" }} />
-
       {/* Reference image drop zone */}
       <div>
         <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
@@ -201,11 +288,22 @@ export function ImageGenerationPanel({
               className="w-full flex items-center justify-center"
               style={{
                 height: 120,
-                background: referenceImage.gradient,
+                background: referenceImage.imageUrl
+                  ? undefined
+                  : referenceImage.gradient,
                 border: "1px solid rgba(244,185,100,0.22)",
+                overflow: "hidden",
               }}
             >
-              <HugeiconsIcon icon={Image02Icon} size={24} color="rgba(255,255,255,0.2)" />
+              {referenceImage.imageUrl ? (
+                <img
+                  src={referenceImage.imageUrl}
+                  alt="Reference"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <HugeiconsIcon icon={Image02Icon} size={24} color="rgba(255,255,255,0.2)" />
+              )}
             </div>
             <button
               onClick={() => onReferenceImageChange(null)}
@@ -256,59 +354,6 @@ export function ImageGenerationPanel({
             )}
           </div>
         )}
-      </div>
-
-      {/* Separator */}
-      <div style={{ height: 1, background: "rgba(244,185,100,0.08)" }} />
-
-      {/* Style selector */}
-      <div>
-        <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
-          Style
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          {STYLE_OPTIONS.map((style) => {
-            const isSelected = selectedStyle === style.id
-            const isFlashing = flashStyle === style.id
-            return (
-              <button
-                key={style.id}
-                onClick={() => handleStyleSelect(style.id)}
-                className="text-left cursor-pointer"
-                style={{
-                  border: `1px solid ${
-                    isSelected
-                      ? "rgba(244,185,100,0.22)"
-                      : "rgba(244,185,100,0.12)"
-                  }`,
-                  background: isSelected
-                    ? "rgba(244,185,100,0.04)"
-                    : "rgba(255,255,255,0.02)",
-                  padding: 8,
-                  transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  animation: isFlashing
-                    ? "sb-style-flash 300ms cubic-bezier(0.34, 1.56, 0.64, 1)"
-                    : undefined,
-                }}
-              >
-                <div
-                  style={{
-                    height: 48,
-                    background: style.gradient,
-                    marginBottom: 6,
-                    border: "1px solid rgba(244,185,100,0.06)",
-                  }}
-                />
-                <span
-                  className="sb-caption"
-                  style={{ color: isSelected ? "#eaeef1" : "#6d8d9f" }}
-                >
-                  {style.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       {/* Separator */}
@@ -450,7 +495,7 @@ export function ImageGenerationPanel({
       <div className="relative">
         <Button
           className="sb-btn-primary w-full"
-          disabled={insufficientCredits || isGenerating}
+          disabled={insufficientCredits || isGenerating || !prompt.trim()}
           onClick={handleGenerate}
         >
           {isGenerating ? "Generating..." : "Generate"}

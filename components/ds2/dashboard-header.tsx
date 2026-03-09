@@ -3,7 +3,8 @@
 import React from "react"
 import Link from "next/link"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ZapIcon, Notification03Icon } from "@hugeicons/core-free-icons"
+import { ZapIcon } from "@hugeicons/core-free-icons"
+import { NotificationBell } from "@/components/ds2/notification-bell"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -22,17 +23,15 @@ interface BreadcrumbEntry {
 interface DashboardHeaderProps {
   breadcrumbs: BreadcrumbEntry[]
   credits: number
-  plan?: "Starter" | "Professional" | "Enterprise"
+  plan?: "Free" | "Starter" | "Professional" | "Enterprise"
   actionButtons?: React.ReactNode
-  hasNotifications?: boolean
 }
 
 export function DashboardHeader({
   breadcrumbs,
   credits,
-  plan = "Professional",
+  plan,
   actionButtons,
-  hasNotifications = false,
 }: DashboardHeaderProps) {
   return (
     <header
@@ -76,17 +75,19 @@ export function DashboardHeader({
       {/* Right side: plan, credits, actions, notifications */}
       <div className="flex items-center gap-3">
         {/* Plan badge */}
-        <div
-          className="px-3 py-1.5 sb-label"
-          style={{
-            background: "rgba(244, 185, 100, 0.08)",
-            border: "1px solid rgba(244, 185, 100, 0.12)",
-            color: "#f4b964",
-            letterSpacing: "0.08em",
-          }}
-        >
-          {plan}
-        </div>
+        {plan && (
+          <div
+            className="px-3 py-1.5 sb-label"
+            style={{
+              background: "rgba(244, 185, 100, 0.08)",
+              border: "1px solid rgba(244, 185, 100, 0.12)",
+              color: "#f4b964",
+              letterSpacing: "0.08em",
+            }}
+          >
+            {plan}
+          </div>
+        )}
 
         {/* Credits indicator */}
         <Link
@@ -111,20 +112,7 @@ export function DashboardHeader({
         {actionButtons}
 
         {/* Notification bell */}
-        <button
-          className="relative p-2 transition-all duration-200 text-[#6d8d9f] hover:text-[#eaeef1] hover:-translate-y-0.5 active:translate-y-px cursor-pointer"
-          style={{
-            transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-          }}
-        >
-          <HugeiconsIcon icon={Notification03Icon} strokeWidth={2} className="size-5" />
-          {hasNotifications && (
-            <div
-              className="absolute top-1.5 right-1.5 w-1.5 h-1.5 sb-pulse-dot"
-              style={{ background: "#f4b964" }}
-            />
-          )}
-        </button>
+        <NotificationBell />
       </div>
     </header>
   )

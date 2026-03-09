@@ -8,9 +8,23 @@
  * @module
  */
 
+import type * as analytics from "../analytics.js";
+import type * as brands from "../brands.js";
+import type * as credits from "../credits.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as imageActions from "../imageActions.js";
+import type * as images from "../images.js";
+import type * as notifications from "../notifications.js";
 import type * as polar from "../polar.js";
+import type * as postformeActions from "../postformeActions.js";
+import type * as postformeWebhookEvents from "../postformeWebhookEvents.js";
+import type * as productImages from "../productImages.js";
+import type * as products from "../products.js";
+import type * as scheduledPosts from "../scheduledPosts.js";
+import type * as socialAccounts from "../socialAccounts.js";
 import type * as users from "../users.js";
+import type * as webhookLogs from "../webhookLogs.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +33,23 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
+  brands: typeof brands;
+  credits: typeof credits;
+  crons: typeof crons;
   http: typeof http;
+  imageActions: typeof imageActions;
+  images: typeof images;
+  notifications: typeof notifications;
   polar: typeof polar;
+  postformeActions: typeof postformeActions;
+  postformeWebhookEvents: typeof postformeWebhookEvents;
+  productImages: typeof productImages;
+  products: typeof products;
+  scheduledPosts: typeof scheduledPosts;
+  socialAccounts: typeof socialAccounts;
   users: typeof users;
+  webhookLogs: typeof webhookLogs;
 }>;
 
 /**

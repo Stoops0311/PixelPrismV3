@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import { format } from "date-fns"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -28,13 +31,30 @@ import { DS2DataTable, type DS2Column } from "@/components/ds2/data-table"
 import { StatusBadge } from "@/components/ds2/status-badge"
 import { ImageGenerationPanel } from "@/components/ds2/image-generation-panel"
 import { MasonryGallery } from "@/components/ds2/masonry-gallery"
-import { showSuccess, showInfo } from "@/components/ds2/toast"
-import {
-  MOCK_PRODUCTS,
-  MOCK_GENERATED_IMAGES,
-  MOCK_CREDITS,
-} from "@/lib/mock-data"
-import type { GeneratedImage, GenerationConfig } from "@/types/dashboard"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import { showSuccess, showInfo, showError } from "@/components/ds2/toast"
+import type { GeneratedImage, GenerationConfig, Product } from "@/types/dashboard"
+
+// ── Gradient generation for images without URLs ─────────────────────────
+
+const GRADIENT_PALETTE = [
+  "linear-gradient(135deg, #1a3a4a 0%, #2a5a3a 50%, #1a4a3a 100%)",
+  "linear-gradient(135deg, #3a2a1a 0%, #5a3a2a 50%, #4a2a1a 100%)",
+  "linear-gradient(135deg, #2a2a3a 0%, #3a3a5a 50%, #2a2a4a 100%)",
+  "linear-gradient(135deg, #4a3a1a 0%, #6a4a2a 50%, #5a3a1a 100%)",
+  "linear-gradient(135deg, #1a2a3a 0%, #2a4a5a 50%, #1a3a4a 100%)",
+  "linear-gradient(135deg, #2a3a2a 0%, #3a5a3a 50%, #2a4a2a 100%)",
+  "linear-gradient(135deg, #3a2a3a 0%, #4a3a5a 50%, #3a2a4a 100%)",
+  "linear-gradient(135deg, #2a4a3a 0%, #1a5a4a 50%, #2a3a4a 100%)",
+]
+
+function hashGradient(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
+  }
+  return GRADIENT_PALETTE[Math.abs(hash) % GRADIENT_PALETTE.length]
+}
 
 // ── Status map for badge rendering ──────────────────────────────────────
 
@@ -42,6 +62,8 @@ const STATUS_MAP: Record<string, string> = {
   ready: "live",
   scheduled: "scheduled",
   posted: "paid",
+  generating: "pending",
+  failed: "overdue",
 }
 
 // ── List view columns ───────────────────────────────────────────────────
@@ -128,10 +150,65 @@ function buildListColumns(
 // ── Page ─────────────────────────────────────────────────────────────────
 
 export default function StudioPage() {
+  const params = useParams()
+  const router = useRouter()
+  const brandSlug = params.brandSlug as string
   const searchParams = useSearchParams()
+
+  // ── Convex queries ──────────────────────────────────────────────────
+  const brand = useQuery(api.brands.getBySlug, { slug: brandSlug })
+  const rawProducts = useQuery(api.products.listByBrand, brand ? { brandId: brand._id } : "skip")
+  const rawImages = useQuery(api.images.listByBrand, brand ? { brandId: brand._id } : "skip")
+  const balance = useQuery(api.credits.getBalance)
+  const createBatch = useMutation(api.images.createBatch)
+  const removeImage = useMutation(api.images.remove)
+
+  // ── Map Convex products to Product type for ImageGenerationPanel ────
+  const products: Product[] = useMemo(() => {
+    if (!rawProducts) return []
+    return rawProducts.map((p) => ({
+      id: p._id,
+      name: p.name,
+      description: p.description,
+      imageCount: p.generatedImagesCount,
+      creditsSpent: p.creditsSpent,
+      createdAt: new Date(p.createdAt).toISOString(),
+      gradient: p.gradientPreview || hashGradient(p._id),
+    }))
+  }, [rawProducts])
+
+  // ── Build a product name lookup for images ──────────────────────────
+  const productNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    if (rawProducts) {
+      for (const p of rawProducts) {
+        map[p._id] = p.name
+      }
+    }
+    return map
+  }, [rawProducts])
+
+  // ── Map Convex images to GeneratedImage type ────────────────────────
+  const allImages: GeneratedImage[] = useMemo(() => {
+    if (!rawImages) return []
+    return rawImages.map((img) => ({
+      id: img._id,
+      productId: img.productId,
+      productName: img.productId ? productNameMap[img.productId] : undefined,
+      imageUrl: img.imageUrl,
+      gradient: hashGradient(img._id),
+      aspectRatio: img.aspectRatio as GeneratedImage["aspectRatio"],
+      status: img.status as GeneratedImage["status"],
+      errorMessage: img.errorMessage,
+      createdAt: new Date(img.createdAt).toISOString(),
+      creditsUsed: img.creditsUsed,
+    }))
+  }, [rawImages, productNameMap])
+
+  // ── Pre-selected product from URL ───────────────────────────────────
   const preSelectedProductId = searchParams.get("product")
   const preSelectedProduct = preSelectedProductId
-    ? MOCK_PRODUCTS.find((p) => p.id === preSelectedProductId)
+    ? products.find((p) => p.id === preSelectedProductId)
     : undefined
 
   // Generation state
@@ -148,7 +225,7 @@ export default function StudioPage() {
 
   // Filtered images
   const filteredImages = useMemo(() => {
-    let images = [...MOCK_GENERATED_IMAGES]
+    let images = [...allImages]
     if (filterProduct !== "all") {
       images = images.filter((img) => img.productId === filterProduct)
     }
@@ -167,13 +244,16 @@ export default function StudioPage() {
       )
     }
     return images
-  }, [filterProduct, filterStatus, sortBy])
+  }, [allImages, filterProduct, filterStatus, sortBy])
 
-  // Generation handler
-  const handleGenerate = useCallback((config: GenerationConfig) => {
+  // Generation handler — calls Convex mutation
+  const handleGenerate = useCallback(async (config: GenerationConfig) => {
+    if (!brand) return
+
     setIsGenerating(true)
     setGenerationProgress(0)
 
+    // Simulate progress (real-time updates come via useQuery subscription)
     const interval = setInterval(() => {
       setGenerationProgress((prev) => {
         if (prev >= 95) {
@@ -184,16 +264,34 @@ export default function StudioPage() {
       })
     }, 300)
 
-    setTimeout(() => {
+    try {
+      await createBatch({
+        brandId: brand._id,
+        prompt: config.prompt,
+        qualityTier: config.quality === "hd" ? "mid" : config.quality === "ultra" ? "premium" : "standard",
+        aspectRatio: config.aspectRatio,
+        quantity: config.quantity,
+        productId: config.productId as Id<"products"> | undefined,
+        stylePreset: config.stylePreset || undefined,
+      })
+
       clearInterval(interval)
       setGenerationProgress(100)
-      setIsGenerating(false)
       showSuccess(
-        "Images generated",
-        `${config.quantity} images added to your gallery`
+        "Images generating",
+        `${config.quantity} images queued — they'll appear in the gallery as they complete`
       )
-    }, 2500)
-  }, [])
+    } catch (err: unknown) {
+      clearInterval(interval)
+      const message = err instanceof Error ? err.message : "Something went wrong"
+      showError("Generation failed", message)
+    } finally {
+      setTimeout(() => {
+        setIsGenerating(false)
+        setGenerationProgress(0)
+      }, 500)
+    }
+  }, [brand, createBatch])
 
   // Action handlers
   const handleUseAsReference = useCallback((image: GeneratedImage) => {
@@ -202,16 +300,57 @@ export default function StudioPage() {
   }, [])
 
   const handleSchedule = useCallback((image: GeneratedImage) => {
-    showInfo("Schedule", `Scheduling ${image.productName || "Brand Image"}...`)
-  }, [])
+    const url = new URL(
+      `/dashboard/${brandSlug}/scheduling`,
+      window.location.origin
+    )
+    url.searchParams.set("imageId", image.id)
+    if (image.imageUrl) {
+      url.searchParams.set("imageUrl", image.imageUrl)
+    }
 
-  const handleDownload = useCallback((image: GeneratedImage) => {
-    showInfo("Download", `Downloading ${image.productName || "Brand Image"}...`)
-  }, [])
+    showInfo("Scheduling", "Opening scheduling composer with selected image")
+    router.push(`${url.pathname}${url.search}`)
+  }, [brandSlug, router])
 
-  const handleDelete = useCallback((_image: GeneratedImage) => {
-    showInfo("Deleted", `Image removed from gallery`)
-  }, [])
+  const handleDownload = useCallback(async (image: GeneratedImage) => {
+    if (!image.imageUrl) {
+      showError("Download unavailable", "This image is not ready yet")
+      return
+    }
+
+    try {
+      const response = await fetch(image.imageUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image (${response.status})`)
+      }
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = objectUrl
+      anchor.download = `${brandSlug}-${image.id}.webp`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+
+      showInfo("Download started", "Image download has started")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not download image"
+      showError("Download failed", message)
+    }
+  }, [brandSlug])
+
+  const handleDelete = useCallback(async (image: GeneratedImage) => {
+    try {
+      await removeImage({ imageId: image.id as Id<"generatedImages"> })
+      showInfo("Deleted", "Image removed from gallery")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not remove image"
+      showError("Delete failed", message)
+    }
+  }, [removeImage])
 
   const handleClearFilters = useCallback(() => {
     setFilterProduct("all")
@@ -234,6 +373,23 @@ export default function StudioPage() {
   const hasActiveFilters =
     filterProduct !== "all" || filterStatus !== "all"
 
+  // ── Loading state ───────────────────────────────────────────────────
+  if (brand === undefined || rawProducts === undefined || rawImages === undefined || balance === undefined) {
+    return (
+      <div className="flex items-center justify-center" style={{ height: "calc(100vh - 64px)" }}>
+        <DS2Spinner />
+      </div>
+    )
+  }
+
+  if (!brand) {
+    return (
+      <div className="flex items-center justify-center" style={{ height: "calc(100vh - 64px)" }}>
+        <p className="sb-body" style={{ color: "#6d8d9f" }}>Brand not found.</p>
+      </div>
+    )
+  }
+
   return (
     <div
       data-studio-layout
@@ -253,9 +409,9 @@ export default function StudioPage() {
         }}
       >
         <ImageGenerationPanel
-          products={MOCK_PRODUCTS}
+          products={products}
           preSelectedProduct={preSelectedProduct}
-          availableCredits={MOCK_CREDITS}
+          availableCredits={balance.total}
           onGenerate={handleGenerate}
           isGenerating={isGenerating}
           generationProgress={generationProgress}
@@ -285,7 +441,7 @@ export default function StudioPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Products</SelectItem>
-              {MOCK_PRODUCTS.map((p) => (
+              {products.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
                 </SelectItem>
@@ -305,11 +461,11 @@ export default function StudioPage() {
             <ToggleGroupItem value="ready" style={{ fontSize: 12, padding: "8px 12px" }}>
               Ready
             </ToggleGroupItem>
-            <ToggleGroupItem value="scheduled" style={{ fontSize: 12, padding: "8px 12px" }}>
-              Scheduled
+            <ToggleGroupItem value="generating" style={{ fontSize: 12, padding: "8px 12px" }}>
+              Generating
             </ToggleGroupItem>
-            <ToggleGroupItem value="posted" style={{ fontSize: 12, padding: "8px 12px" }}>
-              Posted
+            <ToggleGroupItem value="failed" style={{ fontSize: 12, padding: "8px 12px" }}>
+              Failed
             </ToggleGroupItem>
           </ToggleGroup>
 
@@ -376,37 +532,27 @@ export default function StudioPage() {
           ) : (
             <DS2DataTable columns={listColumns} data={filteredImages} />
           )
-        ) : MOCK_GENERATED_IMAGES.length === 0 ? (
+        ) : allImages.length === 0 ? (
           /* No images at all — empty state */
-          <div className="mt-8">
-            <div className="text-center mb-8">
-              <HugeiconsIcon
-                icon={Image02Icon}
-                size={48}
-                color="#6d8d9f"
-              />
-              <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-                No images generated yet.
-              </p>
-              <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
-                Configure your options and hit Generate.
-              </p>
+          <div className="flex flex-col items-center justify-center" style={{ minHeight: "50vh" }}>
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 80,
+                height: 80,
+                background: "rgba(244,185,100,0.04)",
+                border: "1px solid rgba(244,185,100,0.12)",
+                marginBottom: 20,
+              }}
+            >
+              <HugeiconsIcon icon={Image02Icon} size={32} color="rgba(244,185,100,0.3)" />
             </div>
-            <div className="grid grid-cols-2 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-center"
-                  style={{
-                    height: i % 2 === 0 ? 160 : 200,
-                    border: "2px dashed rgba(244,185,100,0.12)",
-                    background: "rgba(244,185,100,0.02)",
-                    animation: "sb-empty-pulse 2s ease-in-out infinite",
-                    animationDelay: `${i * 150}ms`,
-                  }}
-                />
-              ))}
-            </div>
+            <p className="sb-body" style={{ color: "#6d8d9f" }}>
+              Your generated images will appear here
+            </p>
+            <p className="sb-caption mt-2" style={{ color: "#4a6a7a" }}>
+              Write a prompt and hit Generate to get started
+            </p>
           </div>
         ) : (
           /* Filters returned nothing */

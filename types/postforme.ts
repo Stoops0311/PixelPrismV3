@@ -4,37 +4,61 @@
  * TypeScript interfaces for PostForMe social media API integration.
  */
 
-export type PostForMePlatform = "instagram" | "facebook" | "twitter" | "linkedin";
+export type PostForMePlatform =
+  | "instagram"
+  | "facebook"
+  | "linkedin"
+  | "pinterest"
+  | "x"
+  | "twitter"
+  | "tiktok"
+  | "tiktok_business"
+  | "youtube"
+  | "threads"
+  | "bluesky";
 
 export const POSTFORME_PLATFORMS: Record<string, PostForMePlatform> = {
   INSTAGRAM: "instagram",
   FACEBOOK: "facebook",
+  X: "x",
   TWITTER: "twitter",
   LINKEDIN: "linkedin",
+  PINTEREST: "pinterest",
 } as const;
 
 export interface SocialAccount {
   id: string;
   platform: PostForMePlatform;
-  name: string;
-  handle: string;
+  name?: string;
+  handle?: string;
+  username?: string;
+  user_id?: string;
+  status?: "connected" | "disconnected";
   avatarUrl?: string;
+  profile_photo_url?: string;
   permissions: string[];
   connectedAt: string;
   expiresAt?: string;
   isActive: boolean;
+  external_id?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface GetAuthUrlRequest {
   platform: PostForMePlatform;
+  redirect_url_override?: string;
+  permissions?: Array<"posts" | "feeds">;
+  platform_data?: Record<string, unknown>;
+  external_id?: string;
   redirectUrl?: string;
   state?: string;
 }
 
 export interface GetAuthUrlResponse {
   url: string;
-  state: string;
-  expiresAt: string;
+  platform?: string;
+  state?: string;
+  expiresAt?: string;
 }
 
 export interface OAuthCallbackData {
@@ -46,6 +70,8 @@ export interface OAuthCallbackData {
 export interface CreateUploadUrlResponse {
   uploadUrl: string;
   mediaUrl: string;
+  upload_url?: string;
+  media_url?: string;
   expiresAt: string;
   mediaId: string;
 }
@@ -77,6 +103,11 @@ export interface Post {
 }
 
 export interface CreatePostRequest {
+  caption?: string;
+  social_accounts?: string[];
+  media?: Array<{ url: string; thumbnail_url?: string }>;
+  scheduled_at?: string | null;
+
   content: string;
   mediaUrls: string[];
   targetAccountIds: string[];
@@ -90,6 +121,11 @@ export interface CreatePostResponse {
 }
 
 export interface UpdatePostRequest {
+  caption?: string;
+  social_accounts?: string[];
+  media?: Array<{ url: string; thumbnail_url?: string }>;
+  scheduled_at?: string | null;
+
   content?: string;
   mediaUrls?: string[];
   targetAccountIds?: string[];
@@ -189,7 +225,13 @@ export type WebhookEventType =
   | "account.connected"
   | "account.disconnected"
   | "account.token_refreshed"
-  | "analytics.updated";
+  | "analytics.updated"
+  | "social.post.created"
+  | "social.post.updated"
+  | "social.post.deleted"
+  | "social.post.result.created"
+  | "social.account.created"
+  | "social.account.updated";
 
 export interface WebhookPayload {
   event: WebhookEventType;

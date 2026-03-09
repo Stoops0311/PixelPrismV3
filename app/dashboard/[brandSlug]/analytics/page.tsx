@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { useMemo, useState } from "react"
+import { useParams } from "next/navigation"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   InstagramIcon,
-  TiktokIcon,
   Facebook02Icon,
+  Link04Icon,
   AiChat02Icon,
   AnalyticsUpIcon,
   Analytics01Icon,
@@ -19,32 +21,27 @@ import { DS2AreaChart } from "@/components/ds2/chart-area"
 import { DS2BarChart } from "@/components/ds2/chart-bar"
 import { DS2DataTable } from "@/components/ds2/data-table"
 import { DS2EmptyContainer } from "@/components/ds2/empty-container"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import { showError, showSuccess } from "@/components/ds2/toast"
 import type { DS2Column } from "@/components/ds2/data-table"
 import type { ChartConfig } from "@/components/ui/chart"
 import type { TopContent } from "@/types/dashboard"
-import {
-  MOCK_BRAND_DETAILS,
-  MOCK_FOLLOWER_GROWTH,
-  MOCK_ENGAGEMENT_BREAKDOWN,
-  MOCK_TOP_CONTENT,
-  MOCK_LOGOS_ANALYTICS_INSIGHTS,
-  MOCK_AUDIENCE_GROWTH,
-  MOCK_ANALYTICS_STATS,
-} from "@/lib/mock-data"
 import { format } from "date-fns"
 
 // ── Platform Helpers ──────────────────────────────────────────────────────
 
 const PLATFORM_ICONS: Record<string, { icon: typeof InstagramIcon; label: string }> = {
   instagram: { icon: InstagramIcon, label: "Instagram" },
-  tiktok: { icon: TiktokIcon, label: "TikTok" },
   facebook: { icon: Facebook02Icon, label: "Facebook" },
+  linkedin: { icon: Link04Icon, label: "LinkedIn" },
+  pinterest: { icon: Link04Icon, label: "Pinterest" },
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
   instagram: "#e8956a",
-  tiktok: "#64dcf4",
   facebook: "#64dcf4",
+  linkedin: "#f4b964",
+  pinterest: "#f4d494",
 }
 
 // ── HeadlineMetric (page-local) ───────────────────────────────────────────
@@ -52,13 +49,21 @@ const PLATFORM_COLORS: Record<string, string> = {
 function HeadlineMetric({
   change,
   changePercent,
+  totalFollowers,
 }: {
   change: number
-  changePercent: number
+  changePercent?: number
+  totalFollowers: number
 }) {
   return (
     <div className="flex items-end gap-6 flex-wrap">
       <div>
+        <span className="sb-caption" style={{ color: "#6d8d9f", display: "block", marginBottom: 4 }}>
+          total followers
+        </span>
+        <span className="sb-data" style={{ color: "#eaeef1", display: "block", marginBottom: 10 }}>
+          {totalFollowers.toLocaleString()}
+        </span>
         <span
           className="sb-counter-roll"
           style={{
@@ -80,18 +85,25 @@ function HeadlineMetric({
         className="sb-data inline-flex items-center gap-1.5 sb-counter-roll"
         style={{ color: "#f4b964", marginBottom: 6 }}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-          <polygon points="5,1 9,7 1,7" />
-        </svg>
-        +{changePercent}%
+        {changePercent !== undefined ? (
+          <>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+              <polygon points="5,1 9,7 1,7" />
+            </svg>
+            {changePercent > 0 ? "+" : ""}
+            {changePercent}%
+          </>
+        ) : (
+          "No baseline"
+        )}
       </span>
     </div>
   )
 }
 
-// ── LogosAnalyticsCard (page-local) ───────────────────────────────────────
+// ── AIAnalyticsCard (page-local) ──────────────────────────────────────────
 
-function LogosAnalyticsCard({ insights }: { insights: { id: string; text: string }[] }) {
+function AIAnalyticsCard({ insights }: { insights: { id: string; text: string }[] }) {
   return (
     <Card>
       <CardContent>
@@ -118,7 +130,7 @@ function LogosAnalyticsCard({ insights }: { insights: { id: string; text: string
               <HugeiconsIcon icon={AiChat02Icon} size={20} color="#f4b964" />
             </div>
             <h4 className="sb-h4" style={{ color: "#eaeef1" }}>
-              Logos Analysis
+              AI Analysis
             </h4>
           </div>
 
@@ -222,48 +234,187 @@ const topContentColumns: DS2Column<TopContent>[] = [
 export default function AnalyticsPage() {
   const params = useParams()
   const brandSlug = params.brandSlug as string
-  const searchParams = useSearchParams()
-  const forceEmpty = searchParams.get('empty') === 'true'
-
-  const brand = MOCK_BRAND_DETAILS.find((b) => b.slug === brandSlug)
-
-  const [dateRange, setDateRange] = useState<"7d" | "30d" | "90d">("30d")
+  const [dateRange, setDateRange] = useState<"7d" | "30d" | "90d" | "all">("30d")
   const [platformFilter, setPlatformFilter] = useState<
-    "all" | "instagram" | "tiktok" | "facebook"
+    "all" | "instagram" | "facebook" | "linkedin" | "pinterest"
   >("all")
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  if (!brand) {
-    return (
-      <div>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
-          Brand not found
-        </h1>
-        <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-          No brand matches the slug &ldquo;{brandSlug}&rdquo;.
-        </p>
-      </div>
-    )
-  }
+  const brand = useQuery(api.brands.getBySlug, { slug: brandSlug })
+  const connectedAccounts = useQuery(
+    api.socialAccounts.listConnectedByBrand,
+    brand ? { brandId: brand._id } : "skip"
+  )
+  const overview = useQuery(
+    api.analytics.getOverview,
+    brand ? { brandId: brand._id, period: dateRange } : "skip"
+  )
+  const followerGrowth = useQuery(
+    api.analytics.getFollowerGrowth,
+    brand ? { brandId: brand._id, period: dateRange } : "skip"
+  )
+  const topContentRows = useQuery(
+    api.analytics.getTopContent,
+    brand ? { brandId: brand._id, limit: 10 } : "skip"
+  )
+  const refreshAnalytics = useMutation(api.analytics.refreshForBrand)
+
+  const rangeCutoffTs = useMemo(() => {
+    if (dateRange === "all") return 0
+    const days = dateRange === "7d" ? 7 : dateRange === "90d" ? 90 : 30
+    return Date.now() - days * 24 * 60 * 60 * 1000
+  }, [dateRange])
 
   // ── Data ──────────────────────────────────────────────────────────────
+  const connectedPlatforms = useMemo(() => {
+    const fromAccounts = new Set<string>((connectedAccounts ?? []).map((a) => a.platform))
+    if (fromAccounts.size > 0) return Array.from(fromAccounts)
 
-  const audienceGrowth = forceEmpty ? null : MOCK_AUDIENCE_GROWTH[brand.id]
-  const stats = forceEmpty ? null : MOCK_ANALYTICS_STATS[brand.id]
-  const allGrowthData = forceEmpty ? [] : (MOCK_FOLLOWER_GROWTH[brand.id] ?? [])
-  const engagementData = forceEmpty ? [] : (MOCK_ENGAGEMENT_BREAKDOWN[brand.id] ?? [])
-  const topContent = forceEmpty ? [] : (MOCK_TOP_CONTENT[brand.id] ?? [])
-  const insights = forceEmpty ? [] : (MOCK_LOGOS_ANALYTICS_INSIGHTS[brand.id] ?? [])
+    const fromTop = new Set<string>((topContentRows ?? []).map((row) => row.platform))
+    if (fromTop.size > 0) return Array.from(fromTop)
 
-  // Slice growth data by date range
-  const growthData = allGrowthData.slice(
-    dateRange === "7d" ? -7 : dateRange === "30d" ? -30 : -90
-  )
+    return ["instagram", "facebook", "linkedin", "pinterest"]
+  }, [connectedAccounts, topContentRows])
+
+  const audienceGrowth = overview
+    ? {
+        change: overview.followerChange,
+        changePercent:
+          typeof overview.followerChangePercent === "number"
+            ? Math.round(overview.followerChangePercent)
+            : undefined,
+      }
+    : null
+
+  const stats = overview
+    ? {
+        engagementRate: {
+          value: `${(overview.engagementRate || 0).toFixed(1)}%`,
+          trend:
+            overview.syncStatus === "error"
+              ? "data sync issue"
+              : `updated ${new Date(overview.lastSyncedAt).toLocaleTimeString()}`,
+          direction: overview.syncStatus === "error" ? ("down" as const) : ("neutral" as const),
+        },
+        totalReach: {
+          value: (overview.totalReach || 0).toLocaleString(),
+          trend: dateRange === "all" ? "all time" : `${dateRange} window`,
+          direction: "neutral" as const,
+        },
+        postsPublished: {
+          value: overview.postsPublished.toLocaleString(),
+          trend: dateRange === "all" ? "all time" : `${dateRange} window`,
+          direction: "neutral" as const,
+        },
+        totalFollowers: {
+          value: overview.followerCount.toLocaleString(),
+          trend: "connected accounts total",
+          direction: "neutral" as const,
+        },
+        bestPost: {
+          value: (overview.bestPostEngagements || 0).toLocaleString(),
+          trend: "top engagement",
+          direction: "neutral" as const,
+          preview: overview.bestPostPreview || "No top post yet",
+          platform:
+            overview.bestPostPlatform === "facebook" ||
+            overview.bestPostPlatform === "linkedin" ||
+            overview.bestPostPlatform === "pinterest"
+              ? overview.bestPostPlatform
+              : "instagram",
+        },
+      }
+    : null
+
+  const allGrowthData = useMemo(() => {
+    if (!followerGrowth || followerGrowth.length === 0) return []
+
+    const grouped = new Map<string, Record<string, number | string>>()
+    for (const row of followerGrowth) {
+      if (row.platform === "aggregate") continue
+      const existing = grouped.get(row.date) || { date: row.date }
+      existing[row.platform] = row.followerCount
+      grouped.set(row.date, existing)
+    }
+
+    if (grouped.size > 0) {
+      return Array.from(grouped.values()).sort((a, b) =>
+        String(a.date) < String(b.date) ? -1 : 1
+      )
+    }
+
+    return followerGrowth
+      .filter((row) => row.platform === "aggregate")
+      .map((row) => ({ date: row.date, instagram: row.followerCount }))
+  }, [followerGrowth])
+
+  const engagementData = useMemo(() => {
+    const rows = (topContentRows ?? []).filter((row) =>
+      dateRange === "all" ? true : row.publishedAt >= rangeCutoffTs
+    )
+
+    const likes = rows.reduce((sum, row) => sum + (row.likes || 0), 0)
+    const comments = rows.reduce((sum, row) => sum + (row.comments || 0), 0)
+    const shares = rows.reduce((sum, row) => sum + (row.shares || 0), 0)
+    const saves = rows.reduce((sum, row) => sum + (row.saves || 0), 0)
+
+    return [
+      { type: "Likes", count: likes },
+      { type: "Comments", count: comments },
+      { type: "Shares", count: shares },
+      { type: "Saves", count: saves },
+    ]
+  }, [dateRange, rangeCutoffTs, topContentRows])
+
+  const topContent = useMemo(() => {
+    if (!topContentRows || topContentRows.length === 0) return []
+    const rows = topContentRows.filter((row) =>
+      dateRange === "all" ? true : row.publishedAt >= rangeCutoffTs
+    )
+
+    return rows.map((row) => ({
+      id: row._id,
+      platform: row.platform,
+      preview: row.preview,
+      engagements: row.engagements,
+      reach: row.reach,
+      publishedAt: new Date(row.publishedAt).toISOString(),
+    }))
+  }, [dateRange, rangeCutoffTs, topContentRows])
+
+  const insights = useMemo(() => {
+    const lines: { id: string; text: string }[] = []
+    if (overview?.syncError) {
+      lines.push({ id: "sync", text: overview.syncError })
+    }
+
+    if (overview?.bestPostPreview) {
+      lines.push({
+        id: "best-post",
+        text: `Top content this period is on ${overview.bestPostPlatform || "instagram"}. Replicate this format for next campaign.`,
+      })
+    }
+
+    if ((overview?.engagementRate || 0) > 0) {
+      lines.push({
+        id: "engagement",
+        text: `Average engagement rate is ${(overview?.engagementRate || 0).toFixed(1)}% over the ${dateRange === "all" ? "all-time" : dateRange} period.`,
+      })
+    }
+
+    return lines
+  }, [dateRange, overview])
+
+  const growthData =
+    dateRange === "all"
+      ? allGrowthData
+      : allGrowthData.slice(dateRange === "7d" ? -7 : dateRange === "30d" ? -30 : -90)
 
   // Build series from connected platforms, filtered by platform filter
   const activePlatforms =
     platformFilter === "all"
-      ? brand.connectedPlatforms
-      : brand.connectedPlatforms.filter((p) => p === platformFilter)
+      ? connectedPlatforms
+      : connectedPlatforms.filter((p) => p === platformFilter)
 
   const areaSeries = activePlatforms.map((p) => ({
     key: p,
@@ -282,8 +433,49 @@ export default function AnalyticsPage() {
     count: { label: "Engagements" },
   }
 
+  const handleRefresh = async () => {
+    if (!brand) return
+    try {
+      setIsRefreshing(true)
+      await refreshAnalytics({ brandId: brand._id })
+      showSuccess("Refresh queued", "Analytics refresh started in the background.")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to refresh analytics"
+      showError("Refresh failed", message)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  if (
+    brand === undefined ||
+    connectedAccounts === undefined ||
+    overview === undefined ||
+    followerGrowth === undefined ||
+    topContentRows === undefined
+  ) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <DS2Spinner />
+      </div>
+    )
+  }
+
+  if (!brand) {
+    return (
+      <div>
+        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
+          Brand not found
+        </h1>
+        <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
+          No brand matches the slug &ldquo;{brandSlug}&rdquo;.
+        </p>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-32">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-3 mb-2">
@@ -304,36 +496,43 @@ export default function AnalyticsPage() {
           <HeadlineMetric
             change={audienceGrowth.change}
             changePercent={audienceGrowth.changePercent}
+            totalFollowers={overview?.followerCount || 0}
           />
         </div>
       )}
 
       {/* ── Filter Bar ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 flex-wrap">
-        <ToggleGroup
+        <div className="flex items-center gap-2">
+          <span className="sb-caption" style={{ color: "#6d8d9f" }}>Range</span>
+          <ToggleGroup
           type="single"
           value={dateRange}
           onValueChange={(val) => {
-            if (val) setDateRange(val as "7d" | "30d" | "90d")
+            if (val) setDateRange(val as "7d" | "30d" | "90d" | "all")
           }}
         >
           <ToggleGroupItem value="7d">7d</ToggleGroupItem>
           <ToggleGroupItem value="30d">30d</ToggleGroupItem>
           <ToggleGroupItem value="90d">90d</ToggleGroupItem>
+          <ToggleGroupItem value="all">All</ToggleGroupItem>
         </ToggleGroup>
+        </div>
 
-        <ToggleGroup
+        <div className="flex items-center gap-2">
+          <span className="sb-caption" style={{ color: "#6d8d9f" }}>Platform</span>
+          <ToggleGroup
           type="single"
           value={platformFilter}
           onValueChange={(val) => {
             if (val)
               setPlatformFilter(
-                val as "all" | "instagram" | "tiktok" | "facebook"
+                val as "all" | "instagram" | "facebook" | "linkedin" | "pinterest"
               )
           }}
         >
-          <ToggleGroupItem value="all">All</ToggleGroupItem>
-          {brand.connectedPlatforms.map((p) => (
+          <ToggleGroupItem value="all">All Platforms</ToggleGroupItem>
+          {connectedPlatforms.map((p) => (
             <ToggleGroupItem key={p} value={p}>
               <HugeiconsIcon
                 icon={PLATFORM_ICONS[p]?.icon ?? InstagramIcon}
@@ -345,6 +544,15 @@ export default function AnalyticsPage() {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        </div>
+
+        <Button
+          className="sb-btn-secondary"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh Analytics"}
+        </Button>
       </div>
 
       {/* ── Primary Chart: Follower Growth ─────────────────────────────── */}
@@ -352,7 +560,7 @@ export default function AnalyticsPage() {
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
           Growth
         </p>
-        <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
           Follower Growth
         </h3>
         {!audienceGrowth ? (
@@ -369,7 +577,7 @@ export default function AnalyticsPage() {
               </div>
               <Button
                 className="sb-btn-primary"
-                onClick={() => window.location.href = '/dashboard/billing'}
+                onClick={() => window.location.href = `/dashboard/${brandSlug}/settings/social`}
               >
                 Connect Account
               </Button>
@@ -390,7 +598,7 @@ export default function AnalyticsPage() {
       {stats && (
         <div
           key={dateRange + platformFilter + "stats"}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
         >
           <div className="sb-stagger-enter" style={{ animationDelay: "0ms" }}>
             <DS2StatCard
@@ -422,9 +630,19 @@ export default function AnalyticsPage() {
               }}
             />
           </div>
+          <div className="sb-stagger-enter" style={{ animationDelay: "180ms" }}>
+            <DS2StatCard
+              label="Total Followers"
+              value={stats.totalFollowers.value}
+              trend={{
+                value: stats.totalFollowers.trend,
+                direction: stats.totalFollowers.direction,
+              }}
+            />
+          </div>
           <div
             className="sb-stagger-enter sb-best-post-card"
-            style={{ animationDelay: "180ms" }}
+            style={{ animationDelay: "240ms" }}
           >
             <DS2StatCard
               label="Best Post"
@@ -446,16 +664,29 @@ export default function AnalyticsPage() {
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             Engagement
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
             Engagement Breakdown
           </h3>
-          <DS2BarChart
-            data={engagementData}
-            dataKey="count"
-            nameKey="type"
-            height={300}
-            config={engagementConfig}
-          />
+          {engagementData.every((item) => item.count === 0) ? (
+            <DS2EmptyContainer minHeight="h-72">
+              <div className="text-center space-y-3">
+                <p className="sb-h4" style={{ color: "#d4dce2" }}>
+                  No engagement metrics yet
+                </p>
+                <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+                  Publish content or refresh analytics to populate likes, comments, shares, and saves.
+                </p>
+              </div>
+            </DS2EmptyContainer>
+          ) : (
+            <DS2BarChart
+              data={engagementData}
+              dataKey="count"
+              nameKey="type"
+              height={300}
+              config={engagementConfig}
+            />
+          )}
         </div>
 
         {/* Right: Top Content */}
@@ -463,15 +694,28 @@ export default function AnalyticsPage() {
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             Content
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
             Top Performing Content
           </h3>
-          <DS2DataTable columns={topContentColumns} data={topContent} />
+          {topContent.length === 0 ? (
+            <DS2EmptyContainer minHeight="h-72">
+              <div className="text-center space-y-3">
+                <p className="sb-h4" style={{ color: "#d4dce2" }}>
+                  No posts found for this range
+                </p>
+                <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+                  Try switching to All time or click Refresh Analytics to load older account posts.
+                </p>
+              </div>
+            </DS2EmptyContainer>
+          ) : (
+            <DS2DataTable columns={topContentColumns} data={topContent} />
+          )}
         </div>
       </div>
 
-      {/* ── Logos Analysis ──────────────────────────────────────────────── */}
-      {insights.length > 0 && <LogosAnalyticsCard insights={insights} />}
+      {/* ── AI Analysis ─────────────────────────────────────────────────── */}
+      {insights.length > 0 && <AIAnalyticsCard insights={insights} />}
     </div>
   )
 }

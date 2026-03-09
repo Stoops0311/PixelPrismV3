@@ -2,35 +2,35 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { DS2ThemeProvider } from "@/components/ds2/theme-provider"
 import { AppSidebar } from "@/components/ds2/sidebar"
 import { DashboardHeader } from "@/components/ds2/dashboard-header"
-import {
-  MOCK_BRANDS,
-  MOCK_USER,
-  MOCK_CREDITS,
-  MOCK_SUBSCRIPTION,
-  MOCK_BRAND_COUNTS,
-  MOCK_PRODUCTS,
-} from "@/lib/mock-data"
+import { DS2Spinner } from "@/components/ds2/spinner"
+import type { Brand, DashboardUser, BrandNavCounts } from "@/types/dashboard"
 
 const SIDEBAR_STORAGE_KEY = "pixelprism-sidebar-open"
 
 /** Map route segments to breadcrumb labels */
 const ROUTE_LABELS: Record<string, string> = {
-  logos: "Logos",
   products: "Products",
   gallery: "Gallery",
   studio: "Studio",
   scheduling: "Scheduling",
   analytics: "Analytics",
+  social: "Social Accounts",
+  settings: "Settings",
   brands: "All Brands",
   billing: "Billing & Credits",
 }
 
-function buildBreadcrumbs(pathname: string) {
+function buildBreadcrumbs(
+  pathname: string,
+  brands: Brand[]
+) {
   const crumbs: { label: string; href?: string }[] = []
 
   // Strip /dashboard prefix
@@ -52,7 +52,7 @@ function buildBreadcrumbs(pathname: string) {
 
   // Brand-scoped routes: [brandSlug] / [page]
   const brandSlug = segments[0]
-  const brand = MOCK_BRANDS.find((b) => b.slug === brandSlug)
+  const brand = brands.find((b) => b.slug === brandSlug)
 
   if (brand) {
     crumbs.push({ label: brand.name, href: `/dashboard/${brand.slug}` })
@@ -64,8 +64,13 @@ function buildBreadcrumbs(pathname: string) {
           label: ROUTE_LABELS[segments[1]] || segments[1],
           href: `/dashboard/${brand.slug}/products`,
         })
-        const product = MOCK_PRODUCTS.find((p) => p.id === segments[2])
-        crumbs.push({ label: product?.name || "Product" })
+        crumbs.push({ label: "Product" })
+      } else if (segments[1] === "settings" && segments[2]) {
+        crumbs.push({
+          label: ROUTE_LABELS[segments[1]] || segments[1],
+          href: `/dashboard/${brand.slug}/settings`,
+        })
+        crumbs.push({ label: ROUTE_LABELS[segments[2]] || segments[2] })
       } else {
         crumbs.push({ label: ROUTE_LABELS[segments[1]] || segments[1] })
       }
@@ -78,6 +83,58 @@ function buildBreadcrumbs(pathname: string) {
   return crumbs
 }
 
+/** Map a Convex brand document to the Brand shape expected by sidebar/UI */
+function toBrand(doc: any): Brand {
+  const initials = doc.name
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+
+  return {
+    id: doc._id,
+    slug: doc.slug,
+    name: doc.name,
+    initials,
+    followers: doc.totalFollowers ?? 0,
+    engagementRate: doc.avgEngagementRate ?? 0,
+  }
+}
+
+/** Map a Convex user document to the DashboardUser shape */
+function toUser(doc: any): DashboardUser {
+  const name = doc.name || doc.email.split("@")[0]
+  const initials = name
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+
+  return {
+    id: doc._id,
+    name,
+    email: doc.email,
+    initials,
+    imageUrl: doc.imageUrl,
+  }
+}
+
+/** Map subscription tier string to plan label */
+function tierToPlan(tier: string): "Free" | "Starter" | "Professional" | "Enterprise" {
+  switch (tier) {
+    case "starter":
+      return "Starter"
+    case "professional":
+      return "Professional"
+    case "enterprise":
+      return "Enterprise"
+    default:
+      return "Free"
+  }
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -85,6 +142,11 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+
+  // Convex queries
+  const convexUser = useQuery(api.users.current)
+  const convexBrands = useQuery(api.brands.list)
+  const creditBalance = useQuery(api.credits.getBalance)
 
   // Load sidebar state from localStorage
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -100,17 +162,53 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(open))
   }, [])
 
-  // Derive current brand from URL
-  const currentBrand = useMemo(() => {
+  // Transform Convex data to UI shapes
+  const brands = useMemo<Brand[]>(
+    () => (convexBrands ?? []).map(toBrand),
+    [convexBrands]
+  )
+
+  const user = useMemo<DashboardUser | null>(
+    () => (convexUser ? toUser(convexUser) : null),
+    [convexUser]
+  )
+
+  const credits = creditBalance?.total ?? 0
+  const plan = convexUser ? tierToPlan(convexUser.subscriptionTier) : undefined
+
+  // Build nav counts from first brand (if available)
+  const currentBrandDoc = useMemo(() => {
+    if (!convexBrands?.length) return null
     const match = pathname.match(/\/dashboard\/([^/]+)/)
     if (match) {
       const slug = match[1]
-      // Skip known global routes
-      if (slug === "brands" || slug === "billing") return MOCK_BRANDS[0]
-      return MOCK_BRANDS.find((b) => b.slug === slug) ?? MOCK_BRANDS[0]
+      if (slug === "brands" || slug === "billing") return convexBrands[0]
+      return convexBrands.find((b) => b.slug === slug) ?? convexBrands[0]
     }
-    return MOCK_BRANDS[0]
-  }, [pathname])
+    return convexBrands[0]
+  }, [pathname, convexBrands])
+
+  const brandNavCounts = useMemo<BrandNavCounts>(() => {
+    if (!currentBrandDoc) return {}
+    return {
+      products: currentBrandDoc.productsCount ?? 0,
+      studio: currentBrandDoc.generatedImagesCount ?? 0,
+      scheduling: currentBrandDoc.scheduledPostsCount ?? 0,
+      social: currentBrandDoc.connectedPlatformCount ?? 0,
+    }
+  }, [currentBrandDoc])
+
+  // Derive current brand from URL
+  const currentBrand = useMemo<Brand | null>(() => {
+    if (!brands.length) return null
+    const match = pathname.match(/\/dashboard\/([^/]+)/)
+    if (match) {
+      const slug = match[1]
+      if (slug === "brands" || slug === "billing") return brands[0]
+      return brands.find((b) => b.slug === slug) ?? brands[0]
+    }
+    return brands[0]
+  }, [pathname, brands])
 
   const handleBrandChange = useCallback(
     (brandSlug: string) => {
@@ -122,7 +220,29 @@ export default function DashboardLayout({
     [pathname, router]
   )
 
-  const breadcrumbs = useMemo(() => buildBreadcrumbs(pathname), [pathname])
+  const breadcrumbs = useMemo(
+    () => buildBreadcrumbs(pathname, brands),
+    [pathname, brands]
+  )
+
+  // Show loading state while data loads
+  if (convexUser === undefined || convexBrands === undefined) {
+    return (
+      <DS2ThemeProvider>
+        <div className="flex items-center justify-center min-h-screen">
+          <DS2Spinner size="lg" />
+        </div>
+      </DS2ThemeProvider>
+    )
+  }
+
+  // Fallback user if not found yet
+  const displayUser = user ?? {
+    id: "",
+    name: "User",
+    email: "",
+    initials: "U",
+  }
 
   return (
     <DS2ThemeProvider>
@@ -133,19 +253,19 @@ export default function DashboardLayout({
           onOpenChange={handleSidebarOpenChange}
         >
           <AppSidebar
-            brands={MOCK_BRANDS}
+            brands={brands}
             currentBrand={currentBrand}
             onBrandChange={handleBrandChange}
-            user={MOCK_USER}
-            logosHasNotification={true}
-            brandNavCounts={MOCK_BRAND_COUNTS}
+            user={displayUser}
+            brandNavCounts={brandNavCounts}
           />
           <SidebarInset>
             <DashboardHeader
               breadcrumbs={breadcrumbs}
-              credits={MOCK_CREDITS}
-              plan={MOCK_SUBSCRIPTION.plan}
-              hasNotifications={true}
+              credits={credits}
+              plan={plan}
+
+
             />
             <main data-slot="dashboard-main" className="w-full flex-1 flex flex-col">
               {children}

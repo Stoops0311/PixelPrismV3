@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback } from "react"
-import { format } from "date-fns"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Image02Icon,
@@ -9,18 +8,20 @@ import {
   Calendar03Icon,
   Download04Icon,
   Delete02Icon,
+  Alert02Icon,
 } from "@hugeicons/core-free-icons"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { DS2Spinner } from "@/components/ds2/spinner"
 import type { GeneratedImage } from "@/types/dashboard"
 
 // ── Aspect ratio to height map ──────────────────────────────────────────
 
 const ASPECT_HEIGHTS: Record<string, number> = {
-  "1:1": 220,
-  "4:5": 260,
-  "16:9": 160,
-  "9:16": 320,
+  "1:1": 200,
+  "16:9": 140,
+  "9:16": 300,
+  "3:4": 240,
+  "4:3": 170,
+  "3:2": 160,
 }
 
 // ── Props ───────────────────────────────────────────────────────────────
@@ -64,14 +65,7 @@ function StudioImageCard({
   onDragStart?: () => void
   onDragEnd?: () => void
 }) {
-  const height = ASPECT_HEIGHTS[image.aspectRatio] ?? 220
-
-  const statusColor =
-    image.status === "ready"
-      ? "#f4b964"
-      : image.status === "scheduled"
-        ? "#e8956a"
-        : "#6d8d9f"
+  const height = ASPECT_HEIGHTS[image.aspectRatio] ?? 200
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -79,6 +73,7 @@ function StudioImageCard({
         "application/json",
         JSON.stringify({
           id: image.id,
+          imageUrl: image.imageUrl,
           gradient: image.gradient,
           aspectRatio: image.aspectRatio,
           productName: image.productName,
@@ -90,130 +85,158 @@ function StudioImageCard({
     [image, onDragStart]
   )
 
+  const isGenerating = image.status === "generating"
+  const isFailed = image.status === "failed"
+  const isReady = image.status === "ready"
+
   return (
     <div
       style={{
         breakInside: "avoid",
-        marginBottom: 24,
+        marginBottom: 12,
         animation: "sb-image-arrive 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
-        animationDelay: `${index * 60}ms`,
+        animationDelay: `${index * 40}ms`,
       }}
     >
-      <Card
-        className="overflow-hidden group"
-        data-interactive
-        draggable={draggable}
-        onDragStart={draggable ? handleDragStart : undefined}
+      <div
+        className="relative overflow-hidden group"
+        draggable={draggable && isReady}
+        onDragStart={draggable && isReady ? handleDragStart : undefined}
         onDragEnd={draggable ? onDragEnd : undefined}
         style={{
-          cursor: draggable ? "grab" : "pointer",
+          cursor: draggable && isReady ? "grab" : isReady ? "pointer" : "default",
+          border: "1px solid rgba(244,185,100,0.08)",
         }}
       >
-        {/* Image area */}
+        {/* Image / placeholder area */}
         <div
-          className="relative w-full flex items-center justify-center transition-transform duration-300"
+          className="relative w-full"
           style={{
-            height,
-            background: image.gradient,
-            transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+            height: image.imageUrl ? "auto" : height,
+            minHeight: image.imageUrl ? height * 0.5 : height,
+            background: image.imageUrl ? "#071a26" : image.gradient,
           }}
         >
-          <HugeiconsIcon
-            icon={Image02Icon}
-            size={24}
-            color="rgba(255,255,255,0.2)"
-          />
-
-          {/* Hover overlay */}
-          {showOverlayActions && (
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-              style={{ background: "rgba(7, 26, 38, 0.7)" }}
-            >
-              {onUseAsReference && (
-                <Button
-                  className="sb-btn-ghost !py-2 !px-3 !min-h-[32px] !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onUseAsReference(image)
-                  }}
-                >
-                  <HugeiconsIcon icon={MagicWand01Icon} size={14} />
-                  <span className="ml-1">Use as Reference</span>
-                </Button>
-              )}
-              {onSchedule && (
-                <Button
-                  className="sb-btn-primary !px-3 !py-2 !min-h-[32px] !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSchedule(image)
-                  }}
-                >
-                  <HugeiconsIcon icon={Calendar03Icon} size={14} />
-                  <span className="ml-1">Schedule</span>
-                </Button>
-              )}
-              {onDownload && (
-                <Button
-                  className="sb-btn-secondary !px-3 !py-2 !min-h-[32px] !text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDownload(image)
-                  }}
-                >
-                  <HugeiconsIcon icon={Download04Icon} size={14} />
-                  <span className="ml-1">Download</span>
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  className="sb-btn-ghost !py-2 !px-3 !min-h-[32px] !text-xs"
-                  style={{ color: "#e85454" }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(image)
-                  }}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} size={14} />
-                </Button>
+          {image.imageUrl ? (
+            <img
+              src={image.imageUrl}
+              alt={image.productName || "Generated image"}
+              style={{
+                width: "100%",
+                display: "block",
+              }}
+              loading="lazy"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              {isGenerating ? (
+                <DS2Spinner />
+              ) : isFailed ? (
+                <div className="flex flex-col items-center gap-2">
+                  <HugeiconsIcon icon={Alert02Icon} size={24} color="#e85454" />
+                  <span className="sb-caption" style={{ color: "#e85454", maxWidth: 140, textAlign: "center" }}>
+                    {image.errorMessage || "Generation failed"}
+                  </span>
+                </div>
+              ) : (
+                <HugeiconsIcon icon={Image02Icon} size={24} color="rgba(255,255,255,0.15)" />
               )}
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between px-3 py-2"
-          style={{ borderTop: "1px solid rgba(244,185,100,0.08)" }}
-        >
-          <span className="sb-caption" style={{ color: "#6d8d9f" }}>
-            {image.productName || "Brand Image"}
-          </span>
-          <div className="flex items-center gap-2">
-            <span
-              className="sb-caption"
+          {/* Hover action bar — bottom gradient with small icons */}
+          {showOverlayActions && isReady && (
+            <div
+              className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 px-2 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               style={{
-                color: "#6d8d9f",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: "10px",
+                background: "linear-gradient(transparent, rgba(7,26,38,0.85))",
               }}
             >
-              {format(new Date(image.createdAt), "MMM d")}
-            </span>
-            <div
-              role="status"
-              aria-label={image.status}
-              title={image.status.charAt(0).toUpperCase() + image.status.slice(1)}
+              {onUseAsReference && (
+                <button
+                  className="cursor-pointer"
+                  title="Use as reference"
+                  onClick={(e) => { e.stopPropagation(); onUseAsReference(image) }}
+                  style={{
+                    padding: "6px",
+                    background: "rgba(7,26,38,0.6)",
+                    border: "1px solid rgba(244,185,100,0.12)",
+                    color: "#d4dce2",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  <HugeiconsIcon icon={MagicWand01Icon} size={14} />
+                </button>
+              )}
+              {onSchedule && (
+                <button
+                  className="cursor-pointer"
+                  title="Schedule post"
+                  onClick={(e) => { e.stopPropagation(); onSchedule(image) }}
+                  style={{
+                    padding: "6px",
+                    background: "rgba(7,26,38,0.6)",
+                    border: "1px solid rgba(244,185,100,0.12)",
+                    color: "#d4dce2",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  <HugeiconsIcon icon={Calendar03Icon} size={14} />
+                </button>
+              )}
+              {onDownload && (
+                <button
+                  className="cursor-pointer"
+                  title="Download"
+                  onClick={(e) => { e.stopPropagation(); onDownload(image) }}
+                  style={{
+                    padding: "6px",
+                    background: "rgba(7,26,38,0.6)",
+                    border: "1px solid rgba(244,185,100,0.12)",
+                    color: "#d4dce2",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  <HugeiconsIcon icon={Download04Icon} size={14} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  className="cursor-pointer"
+                  title="Delete"
+                  onClick={(e) => { e.stopPropagation(); onDelete(image) }}
+                  style={{
+                    padding: "6px",
+                    background: "rgba(7,26,38,0.6)",
+                    border: "1px solid rgba(232,84,84,0.12)",
+                    color: "#e85454",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  <HugeiconsIcon icon={Delete02Icon} size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Failed overlay with delete */}
+          {isFailed && onDelete && (
+            <button
+              className="absolute top-2 right-2 cursor-pointer"
+              title="Delete"
+              onClick={(e) => { e.stopPropagation(); onDelete(image) }}
               style={{
-                width: 6,
-                height: 6,
-                background: statusColor,
+                padding: "4px",
+                background: "rgba(7,26,38,0.8)",
+                border: "1px solid rgba(232,84,84,0.20)",
+                color: "#e85454",
               }}
-            />
-          </div>
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={12} />
+            </button>
+          )}
         </div>
-      </Card>
+      </div>
     </div>
   )
 }
@@ -232,7 +255,7 @@ export function MasonryGallery({
   onDragEnd,
 }: MasonryGalleryProps) {
   return (
-    <div className="[column-count:2]" style={{ columnGap: 24 }}>
+    <div className="[column-count:3]" style={{ columnGap: 12 }}>
       {images.map((image, index) => (
         <StudioImageCard
           key={image.id}

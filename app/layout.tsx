@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
+import { dark } from "@clerk/themes"
 import { ConvexClientProvider } from "@/lib/convex-provider"
 import "./globals.css"
 
@@ -27,7 +28,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        baseTheme: dark,
+        variables: {
+          colorPrimary: "#f4b964",
+          colorBackground: "#071a26",
+          colorInputBackground: "#0a2535",
+          colorText: "#eaeef1",
+          colorTextSecondary: "#6d8d9f",
+          borderRadius: "0px",
+          fontFamily: '"General Sans", sans-serif',
+        },
+      }}
+    >
       <html lang="en" className={jetbrainsMono.variable}>
         <body
           className={`sb-root ${geistSans.variable} ${geistMono.variable} antialiased`}

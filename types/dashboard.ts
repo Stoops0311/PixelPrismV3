@@ -21,12 +21,14 @@ export interface DashboardUser {
   name: string
   email: string
   initials: string
+  imageUrl?: string
 }
 
 export interface BrandNavCounts {
   products?: number
   studio?: number
   scheduling?: number
+  social?: number
 }
 
 export interface UpcomingPost {
@@ -111,9 +113,11 @@ export interface ChatMessage {
 }
 
 export interface GenerationConfig {
+  prompt: string
   style: string
+  stylePreset: string
   quality: "standard" | "hd" | "ultra"
-  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16"
+  aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"
   quantity: number
   productId?: string
   referenceImageId?: string
@@ -123,9 +127,11 @@ export interface GeneratedImage {
   id: string
   productId?: string
   productName?: string
+  imageUrl?: string
   gradient: string
-  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16"
-  status: "ready" | "scheduled" | "posted"
+  aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"
+  status: "generating" | "ready" | "failed"
+  errorMessage?: string
   createdAt: string
   creditsUsed: number
 }
@@ -143,8 +149,9 @@ export interface MiniCalendarPost {
 export interface RecentStudioImage {
   id: string
   gradient: string
+  imageUrl?: string
   productName?: string
-  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16"
+  aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"
   createdAt: string
 }
 
@@ -172,7 +179,7 @@ export interface EngagementBreakdown {
 
 export interface TopContent {
   id: string
-  platform: "instagram" | "tiktok" | "facebook"
+  platform: "instagram" | "tiktok" | "facebook" | "linkedin" | "pinterest"
   preview: string
   engagements: number
   reach: number

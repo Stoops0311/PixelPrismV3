@@ -2,6 +2,8 @@
 
 import { useParams, useSearchParams } from "next/navigation"
 import { useRouter } from "next/navigation"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   InstagramIcon,
@@ -19,17 +21,14 @@ import { Button } from "@/components/ui/button"
 import { DS2StatCard } from "@/components/ds2/stat-card"
 import { StatusBadge } from "@/components/ds2/status-badge"
 import { DS2EmptyContainer } from "@/components/ds2/empty-container"
+import { DS2Spinner } from "@/components/ds2/spinner"
 import {
-  MOCK_BRAND_DETAILS,
-  MOCK_CREDITS,
   MOCK_BRAND_LOGOS_INSIGHTS,
   MOCK_MINI_CALENDAR_POSTS,
-  MOCK_RECENT_STUDIO_IMAGES,
   MOCK_PLATFORM_PERFORMANCE,
 } from "@/lib/mock-data"
 import type {
   MiniCalendarPost,
-  RecentStudioImage,
   PlatformPerformance,
   LogosDigest,
 } from "@/types/dashboard"
@@ -76,7 +75,7 @@ function LogosInsightCard({ insight }: { insight: LogosDigest }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="sb-label mb-1" style={{ color: "#f4b964" }}>
-              Logos Insight
+              AI Insight
             </p>
             <p className="sb-body" style={{ color: "#d4dce2", lineHeight: 1.6 }}>
               {insight.insightText}
@@ -85,7 +84,7 @@ function LogosInsightCard({ insight }: { insight: LogosDigest }) {
         </div>
         <div className="flex justify-end mt-4">
           <Button className="sb-btn-ghost-inline">
-            Chat with Logos
+            View Recommendations
             <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="ml-2" />
           </Button>
         </div>
@@ -96,7 +95,7 @@ function LogosInsightCard({ insight }: { insight: LogosDigest }) {
 
 // ── MiniContentCalendar ──────────────────────────────────────────────────
 
-function MiniContentCalendar({ posts }: { posts: MiniCalendarPost[] }) {
+function MiniContentCalendar({ posts, brandSlug }: { posts: MiniCalendarPost[]; brandSlug: string }) {
   const router = useRouter()
   const today = startOfDay(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i))
@@ -122,10 +121,10 @@ function MiniContentCalendar({ posts }: { posts: MiniCalendarPost[] }) {
                   Connect your social accounts and start scheduling.
                 </p>
               </div>
-              <Button
-                className="sb-btn-secondary"
-                onClick={() => router.push('/dashboard/billing')}
-              >
+                <Button
+                  className="sb-btn-secondary"
+                  onClick={() => router.push(`/dashboard/${brandSlug}/settings/social`)}
+                >
                 Connect Accounts
               </Button>
             </div>
@@ -217,7 +216,7 @@ function MiniContentCalendar({ posts }: { posts: MiniCalendarPost[] }) {
 
 // ── RecentStudioStrip ────────────────────────────────────────────────────
 
-function RecentStudioStrip({ images }: { images: RecentStudioImage[] }) {
+function RecentStudioStrip({ images }: { images: { _id: string; imageUrl?: string; prompt?: string; productId?: string; aspectRatio?: string; createdAt: number }[] }) {
   const router = useRouter()
   const params = useParams()
   const brandSlug = params.brandSlug as string
@@ -269,16 +268,18 @@ function RecentStudioStrip({ images }: { images: RecentStudioImage[] }) {
         <div className="grid grid-cols-2 gap-3">
           {displayImages.map((image) => (
             <div
-              key={image.id}
+              key={image._id}
               className="sb-studio-thumb relative cursor-pointer"
               style={{
-                background: image.gradient,
+                background: image.imageUrl
+                  ? `url(${image.imageUrl}) center/cover`
+                  : "linear-gradient(135deg, #1a3a4a 0%, #2a5a3a 50%, #1a4a3a 100%)",
                 border: "1px solid rgba(244,185,100,0.12)",
                 aspectRatio: "1 / 1",
                 overflow: "hidden",
               }}
             >
-              {image.productName && (
+              {image.prompt && (
                 <div
                   className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
                   style={{
@@ -296,7 +297,7 @@ function RecentStudioStrip({ images }: { images: RecentStudioImage[] }) {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {image.productName}
+                    {image.prompt}
                   </p>
                 </div>
               )}
@@ -422,7 +423,22 @@ export default function BrandDashboardPage() {
   const searchParams = useSearchParams()
   const forceEmpty = searchParams.get('empty') === 'true'
 
-  const brand = MOCK_BRAND_DETAILS.find((b) => b.slug === brandSlug)
+  // Real Convex data
+  const brand = useQuery(api.brands.getBySlug, { slug: brandSlug })
+  const credits = useQuery(api.credits.getBalance)
+  const recentImages = useQuery(
+    api.images.listByBrand,
+    brand ? { brandId: brand._id, status: "ready" as const, limit: 4 } : "skip"
+  )
+
+  // Still loading
+  if (brand === undefined || credits === undefined) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <DS2Spinner />
+      </div>
+    )
+  }
 
   if (!brand) {
     return (
@@ -439,13 +455,17 @@ export default function BrandDashboardPage() {
     )
   }
 
-  const insight = MOCK_BRAND_LOGOS_INSIGHTS[brand.id]
-  const calendarPosts = forceEmpty ? [] : (MOCK_MINI_CALENDAR_POSTS[brand.id] ?? [])
-  const studioImages = forceEmpty ? [] : (MOCK_RECENT_STUDIO_IMAGES[brand.id] ?? [])
-  const platformPerf = MOCK_PLATFORM_PERFORMANCE[brand.id] ?? []
+  // Mock data for features not yet implemented (keyed by old mock IDs — won't match real brands)
+  // These will show empty/default states for real brands, which is correct
+  const mockBrandId = "" // Real brands won't match any mock IDs
+  const insight = MOCK_BRAND_LOGOS_INSIGHTS[mockBrandId]
+  const calendarPosts = forceEmpty ? [] : (MOCK_MINI_CALENDAR_POSTS[mockBrandId] ?? [])
+  const platformPerf = MOCK_PLATFORM_PERFORMANCE[mockBrandId] ?? []
+
+  const studioImages = forceEmpty ? [] : (recentImages ?? [])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-32">
       {/* A. Greeting */}
       <div suppressHydrationWarning>
         <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
@@ -461,23 +481,25 @@ export default function BrandDashboardPage() {
         {[
           {
             label: "Total Followers",
-            value: brand.followers.toLocaleString(),
-            badge: <StatusBadge status="live" />,
+            value: brand.totalFollowers.toLocaleString(),
+            badge: brand.totalFollowers > 0 ? <StatusBadge status="live" /> : undefined,
             trend: undefined,
             valueStyle: undefined,
           },
           {
             label: "Engagement Rate",
-            value: `${brand.engagementRate}%`,
+            value: brand.avgEngagementRate != null ? `${brand.avgEngagementRate}%` : "—",
             badge: undefined,
-            trend: { value: "0.8% vs last week", direction: "up" as const },
+            trend: brand.avgEngagementRate != null
+              ? { value: "vs last week", direction: "neutral" as const }
+              : undefined,
             valueStyle: undefined,
           },
           {
             label: "Credits Remaining",
-            value: MOCK_CREDITS.toString(),
+            value: credits.total.toString(),
             badge: undefined,
-            trend: { value: `${brand.creditsUsed} used this month`, direction: "neutral" as const },
+            trend: { value: `of ${credits.allocation} monthly`, direction: "neutral" as const },
             valueStyle: { color: "#f4b964" },
           },
         ].map((card, i) => (
@@ -497,14 +519,14 @@ export default function BrandDashboardPage() {
         ))}
       </div>
 
-      {/* C. Logos Insight Card */}
+      {/* C. AI Insight Card */}
       {insight && (
         <div>
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             AI Insights
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
-            Logos Insight
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
+            AI Insight
           </h3>
           <LogosInsightCard insight={insight} />
         </div>
@@ -516,16 +538,16 @@ export default function BrandDashboardPage() {
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             Scheduling
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
             Upcoming Week
           </h3>
-          <MiniContentCalendar posts={calendarPosts} />
+          <MiniContentCalendar posts={calendarPosts} brandSlug={brandSlug} />
         </div>
         <div className="lg:col-span-2">
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             Studio
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
             Recent Images
           </h3>
           <RecentStudioStrip images={studioImages} />
@@ -538,7 +560,7 @@ export default function BrandDashboardPage() {
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
             Performance
           </p>
-          <h3 className="sb-h3 mb-4" style={{ color: "#eaeef1" }}>
+          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
             Platform Breakdown
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

@@ -1,48 +1,69 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Download04Icon } from "@hugeicons/core-free-icons"
+import { useMemo, useState } from "react"
+import { useAction, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { DS2BarChart } from "@/components/ds2/chart-bar"
 import { DS2DataTable } from "@/components/ds2/data-table"
 import type { DS2Column } from "@/components/ds2/data-table"
-import { StatusBadge } from "@/components/ds2/status-badge"
+import { DS2Spinner } from "@/components/ds2/spinner"
 import type { ChartConfig } from "@/components/ui/chart"
-import {
-  MOCK_CREDITS,
-  MOCK_SUBSCRIPTION,
-  MOCK_CREDIT_TRANSACTIONS,
-  MOCK_BILLING_HISTORY,
-  MOCK_DAILY_CREDIT_USAGE,
-} from "@/lib/mock-data"
-import type { CreditTransaction, BillingInvoice } from "@/types/dashboard"
-import { format } from "date-fns"
+import { showError, showInfo } from "@/components/ds2/toast"
+import { CREDIT_PACKS, PLAN_PRICE_BY_TIER } from "@/lib/polar"
 
-// ── Credit Balance Card ──────────────────────────────────────────────────
+const PLAN_OPTIONS = [
+  { key: "starter", label: "Starter" },
+  { key: "professional", label: "Professional" },
+  { key: "enterprise", label: "Enterprise" },
+] as const
 
-function CreditBalanceCard() {
-  const [progressValue, setProgressValue] = useState(0)
-  const creditsUsed = MOCK_SUBSCRIPTION.creditsPerMonth - MOCK_CREDITS
-  const usagePercent = (creditsUsed / MOCK_SUBSCRIPTION.creditsPerMonth) * 100
+type PlanTier = (typeof PLAN_OPTIONS)[number]["key"]
+type CreditPackKey = (typeof CREDIT_PACKS)[number]["key"]
+
+function formatTierLabel(tier: string) {
+  if (tier === "professional") return "Professional"
+  if (tier === "enterprise") return "Enterprise"
+  if (tier === "starter") return "Starter"
+  if (tier === "free") return "Free"
+  return "No Plan"
+}
+
+function CreditBalanceCard({
+  total,
+  allocation,
+  selectedPack,
+  onPackChange,
+  onBuyCredits,
+  buying,
+}: {
+  total: number
+  allocation: number
+  selectedPack: CreditPackKey
+  onPackChange: (value: CreditPackKey) => void
+  onBuyCredits: () => void
+  buying: boolean
+}) {
+  const creditsUsed = allocation - total
+  const usagePercent = allocation > 0 ? (Math.max(0, creditsUsed) / allocation) * 100 : 0
   const remainingPercent = 100 - usagePercent
 
-  useEffect(() => {
-    const timer = setTimeout(() => setProgressValue(usagePercent), 100)
-    return () => clearTimeout(timer)
-  }, [usagePercent])
-
-  // Color logic: gold default, coral if <20%, red if <5%
   let valueColor = "#f4b964"
-  if (remainingPercent < 5) {
-    valueColor = "#e85454"
-  } else if (remainingPercent < 20) {
-    valueColor = "#e8956a"
-  }
+  if (remainingPercent < 5) valueColor = "#e85454"
+  else if (remainingPercent < 20) valueColor = "#e8956a"
 
   return (
     <Card>
@@ -50,41 +71,73 @@ function CreditBalanceCard() {
         <p className="sb-label" style={{ color: "#6d8d9f", marginBottom: 16 }}>
           Credits Remaining
         </p>
-        <div className="flex items-center justify-between mb-6">
-          <span
-            className="sb-data"
-            style={{
-              fontSize: 36,
-              color: valueColor,
-              lineHeight: 1,
-            }}
-          >
-            {MOCK_CREDITS}
+
+        <div className="flex items-center justify-between mb-5">
+          <span className="sb-data" style={{ fontSize: 36, color: valueColor, lineHeight: 1 }}>
+            {total}
           </span>
-          <Button className="sb-btn-primary">
-            Buy Credits
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto] gap-2 mb-4">
+          <Select value={selectedPack} onValueChange={(v) => onPackChange(v as CreditPackKey)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CREDIT_PACKS.map((pack) => (
+                <SelectItem key={pack.key} value={pack.key}>
+                  {pack.credits} credits - ${pack.price}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button className="sb-btn-primary" onClick={onBuyCredits} disabled={buying}>
+            {buying ? "Redirecting..." : "Buy Credits"}
           </Button>
         </div>
-        <Progress value={progressValue} className="mb-3" />
+
+        <Progress value={usagePercent} className="mb-3" />
         <p className="sb-caption" style={{ color: "#6d8d9f" }}>
           <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>
-            {creditsUsed}
-          </span>
-          {" "}of{" "}
+            {Math.max(0, Number(creditsUsed.toFixed(2)))}
+          </span>{" "}
+          of{" "}
           <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>
-            {MOCK_SUBSCRIPTION.creditsPerMonth}
-          </span>
-          {" "}credits used this month
+            {allocation}
+          </span>{" "}
+          credits used this month
         </p>
       </CardContent>
     </Card>
   )
 }
 
-// ── Current Plan Card ────────────────────────────────────────────────────
-
-function CurrentPlanCard() {
-  const renewalDate = new Date(MOCK_SUBSCRIPTION.renewalDate)
+function CurrentPlanCard({
+  tier,
+  maxBrands,
+  allocation,
+  maxSocialAccounts,
+  renewalDate,
+  selectedTier,
+  onTierChange,
+  onChangePlan,
+  onManageBilling,
+  changingPlan,
+  openingPortal,
+}: {
+  tier: string
+  maxBrands: number
+  allocation: number
+  maxSocialAccounts: number
+  renewalDate?: number
+  selectedTier: PlanTier
+  onTierChange: (value: PlanTier) => void
+  onChangePlan: () => void
+  onManageBilling: () => void
+  changingPlan: boolean
+  openingPortal: boolean
+}) {
+  const price = PLAN_PRICE_BY_TIER[tier as keyof typeof PLAN_PRICE_BY_TIER] ?? 0
 
   return (
     <Card>
@@ -92,80 +145,67 @@ function CurrentPlanCard() {
         <p className="sb-label" style={{ color: "#6d8d9f", marginBottom: 16 }}>
           Current Plan
         </p>
+
         <div className="flex items-baseline gap-3 mb-4">
           <h3 className="sb-h3" style={{ color: "#eaeef1" }}>
-            {MOCK_SUBSCRIPTION.plan}
+            {formatTierLabel(tier)}
           </h3>
-          <span
-            className="sb-data"
-            style={{ color: "#f4b964", fontSize: 18 }}
-          >
-            ${MOCK_SUBSCRIPTION.pricePerMonth}/mo
+          <span className="sb-data" style={{ color: "#f4b964", fontSize: 18 }}>
+            ${price}/mo
           </span>
         </div>
+
         <p className="sb-caption mb-5" style={{ color: "#6d8d9f" }}>
-          Renews {format(renewalDate, "MMMM d, yyyy")}
+          {renewalDate ? `Renews ${format(new Date(renewalDate), "MMMM d, yyyy")}` : "No renewal date"}
         </p>
+
         <ul className="space-y-2.5 mb-6">
-          <li className="flex items-center gap-2">
-            <span
-              style={{
-                width: 4,
-                height: 4,
-                background: "rgba(244,185,100,0.40)",
-                flexShrink: 0,
-              }}
-            />
-            <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>
-              Up to{" "}
-              <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>
-                {MOCK_SUBSCRIPTION.maxBrands}
-              </span>
-              {" "}brands
-            </span>
+          <li className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+            Up to <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>{maxBrands}</span> brands
           </li>
-          <li className="flex items-center gap-2">
-            <span
-              style={{
-                width: 4,
-                height: 4,
-                background: "rgba(244,185,100,0.40)",
-                flexShrink: 0,
-              }}
-            />
-            <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>
-              <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>
-                {MOCK_SUBSCRIPTION.creditsPerMonth}
-              </span>
-              {" "}credits/month
-            </span>
+          <li className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+            <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>{allocation}</span> credits/month
           </li>
-          <li className="flex items-center gap-2">
-            <span
-              style={{
-                width: 4,
-                height: 4,
-                background: "rgba(244,185,100,0.40)",
-                flexShrink: 0,
-              }}
-            />
-            <span className="sb-body-sm" style={{ color: "#6d8d9f" }}>
-              <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>
-                {MOCK_SUBSCRIPTION.maxSocialAccounts}
-              </span>
-              {" "}social accounts
-            </span>
+          <li className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+            <span className="sb-data" style={{ fontSize: 12, color: "#d4dce2" }}>{maxSocialAccounts}</span> social accounts
           </li>
         </ul>
-        <Button className="sb-btn-secondary">
-          Change Plan
-        </Button>
+
+        <div className="space-y-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Select value={selectedTier} onValueChange={(v) => onTierChange(v as PlanTier)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLAN_OPTIONS.map((plan) => (
+                  <SelectItem key={plan.key} value={plan.key}>
+                    {plan.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button className="sb-btn-secondary" onClick={onChangePlan} disabled={changingPlan}>
+              {changingPlan ? "Redirecting..." : "Change Plan"}
+            </Button>
+          </div>
+
+          <Button className="sb-btn-ghost w-full" onClick={onManageBilling} disabled={openingPortal}>
+            {openingPortal ? "Opening..." : "Manage Billing"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-// ── Usage Tabs ───────────────────────────────────────────────────────────
+interface ConvexTransaction {
+  _id: string
+  type: string
+  amount: number
+  description: string
+  createdAt: number
+}
 
 const chartConfig: ChartConfig = {
   credits: {
@@ -174,17 +214,12 @@ const chartConfig: ChartConfig = {
   },
 }
 
-const chartData = MOCK_DAILY_CREDIT_USAGE.map((d) => ({
-  date: format(new Date(d.date), "MMM d"),
-  credits: d.credits,
-}))
-
-const transactionColumns: DS2Column<CreditTransaction>[] = [
+const transactionColumns: DS2Column<ConvexTransaction>[] = [
   {
-    key: "date",
+    key: "createdAt",
     label: "Date",
     isData: true,
-    render: (val: string) => (
+    render: (val: number) => (
       <span className="sb-data" style={{ color: "#d4dce2", fontSize: 12, fontWeight: 500 }}>
         {format(new Date(val), "MMM d, yyyy")}
       </span>
@@ -200,34 +235,46 @@ const transactionColumns: DS2Column<CreditTransaction>[] = [
     ),
   },
   {
-    key: "creditsUsed",
+    key: "amount",
     label: "Credits",
     align: "right",
     isData: true,
     render: (val: number) => (
-      <span className="sb-data" style={{ color: "#eaeef1" }}>
+      <span className="sb-data" style={{ color: val < 0 ? "#e8956a" : "#a4f464" }}>
+        {val > 0 ? "+" : ""}
         {val}
       </span>
     ),
   },
 ]
 
-function UsageTabs() {
-  const brandsUsed = 3
-  const brandsMax = MOCK_SUBSCRIPTION.maxBrands
-  const socialUsed = 7
-  const socialMax = MOCK_SUBSCRIPTION.maxSocialAccounts
+function UsageTabs({
+  transactions,
+  dailyUsage,
+  maxBrands,
+  maxSocialAccounts,
+  socialUsed,
+}: {
+  transactions: ConvexTransaction[]
+  dailyUsage: Array<{ date: string; credits: number }>
+  maxBrands: number
+  maxSocialAccounts: number
+  socialUsed: number
+}) {
+  const brands = useQuery(api.brands.list)
+  const brandsUsed = brands?.length ?? 0
 
-  const [brandsProgress, setBrandsProgress] = useState(0)
-  const [socialProgress, setSocialProgress] = useState(0)
+  const chartData = useMemo(
+    () =>
+      dailyUsage.map((d) => ({
+        date: format(new Date(`${d.date}T00:00:00Z`), "MMM d"),
+        credits: d.credits,
+      })),
+    [dailyUsage]
+  )
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setBrandsProgress((brandsUsed / brandsMax) * 100)
-      setSocialProgress((socialUsed / socialMax) * 100)
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [brandsMax, socialMax])
+  const brandsProgress = maxBrands > 0 ? (brandsUsed / maxBrands) * 100 : 0
+  const socialProgress = maxSocialAccounts > 0 ? (socialUsed / maxSocialAccounts) * 100 : 0
 
   return (
     <Tabs defaultValue="credits">
@@ -245,25 +292,16 @@ function UsageTabs() {
           height={240}
           config={chartConfig}
         />
-        <DS2DataTable
-          columns={transactionColumns}
-          data={MOCK_CREDIT_TRANSACTIONS}
-        />
+        <DS2DataTable columns={transactionColumns} data={transactions} />
       </TabsContent>
 
       <TabsContent value="brands" className="pt-6">
         <Card>
           <CardContent>
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="sb-data-lg" style={{ color: "#f4b964" }}>
-                {brandsUsed}
-              </span>
+              <span className="sb-data-lg" style={{ color: "#f4b964" }}>{brandsUsed}</span>
               <span className="sb-body" style={{ color: "#6d8d9f" }}>
-                of{" "}
-                <span className="sb-data" style={{ color: "#d4dce2" }}>
-                  {brandsMax}
-                </span>
-                {" "}brands used
+                of <span className="sb-data" style={{ color: "#d4dce2" }}>{maxBrands}</span> brands used
               </span>
             </div>
             <Progress value={brandsProgress} />
@@ -275,15 +313,9 @@ function UsageTabs() {
         <Card>
           <CardContent>
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="sb-data-lg" style={{ color: "#f4b964" }}>
-                {socialUsed}
-              </span>
+              <span className="sb-data-lg" style={{ color: "#f4b964" }}>{socialUsed}</span>
               <span className="sb-body" style={{ color: "#6d8d9f" }}>
-                of{" "}
-                <span className="sb-data" style={{ color: "#d4dce2" }}>
-                  {socialMax}
-                </span>
-                {" "}social accounts connected
+                of <span className="sb-data" style={{ color: "#d4dce2" }}>{maxSocialAccounts}</span> social accounts connected
               </span>
             </div>
             <Progress value={socialProgress} />
@@ -294,85 +326,164 @@ function UsageTabs() {
   )
 }
 
-// ── Billing History Table ────────────────────────────────────────────────
-
-const invoiceColumns: DS2Column<BillingInvoice>[] = [
-  {
-    key: "date",
-    label: "Date",
-    isData: true,
-    render: (val: string) => (
-      <span className="sb-data" style={{ color: "#d4dce2", fontSize: 12, fontWeight: 500 }}>
-        {format(new Date(val), "MMM d, yyyy")}
-      </span>
-    ),
-  },
-  {
-    key: "amount",
-    label: "Amount",
-    isData: true,
-    render: (val: number) => (
-      <span className="sb-data" style={{ color: "#eaeef1" }}>
-        ${val.toFixed(2)}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    label: "Status",
-    render: (val: string) => <StatusBadge status={val} />,
-  },
-  {
-    key: "id",
-    label: "",
-    align: "right",
-    render: () => (
-      <Button
-        className="sb-btn-ghost-inline"
-        size="sm"
-        aria-label="Download invoice"
-      >
-        <HugeiconsIcon icon={Download04Icon} size={16} />
-      </Button>
-    ),
-  },
-]
-
-// ── Page ─────────────────────────────────────────────────────────────────
-
 export default function BillingPage() {
+  const user = useQuery(api.users.current)
+  const balance = useQuery(api.credits.getBalance)
+  const transactionsResult = useQuery(api.credits.getTransactions, { limit: 40 })
+  const dailyUsage = useQuery(api.credits.getDailyUsage, { days: 30 })
+  const connectedAccounts = useQuery(api.socialAccounts.listConnectedForCurrentUser)
+
+  const generateTopUpCheckoutLink = useAction(api.polar.generateTopUpCheckoutLink)
+  const generatePlanCheckoutLink = useAction(api.polar.generatePlanCheckoutLink)
+  const generateCustomerPortalUrl = useAction(api.polar.generateCustomerPortalUrl)
+
+  const [selectedPack, setSelectedPack] = useState<CreditPackKey>("credits_100")
+  const [selectedTier, setSelectedTier] = useState<PlanTier>("professional")
+  const [buyingCredits, setBuyingCredits] = useState(false)
+  const [changingPlan, setChangingPlan] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
+
+  const transactions: ConvexTransaction[] = useMemo(() => {
+    if (!transactionsResult?.transactions) return []
+    return transactionsResult.transactions as unknown as ConvexTransaction[]
+  }, [transactionsResult])
+
+  if (
+    user === undefined ||
+    balance === undefined ||
+    transactionsResult === undefined ||
+    dailyUsage === undefined ||
+    connectedAccounts === undefined
+  ) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <DS2Spinner />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <p className="sb-body" style={{ color: "#6d8d9f" }}>
+          Please sign in to view billing.
+        </p>
+      </div>
+    )
+  }
+
+  const startTopUpCheckout = async () => {
+    try {
+      setBuyingCredits(true)
+      const result = await generateTopUpCheckoutLink({
+        packKey: selectedPack,
+        origin: window.location.origin,
+        successUrl: `${window.location.origin}/dashboard/billing`,
+      })
+      window.location.href = result.url
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to start checkout"
+      showError("Buy credits failed", message)
+      setBuyingCredits(false)
+    }
+  }
+
+  const startPlanCheckout = async () => {
+    if (selectedTier === user.subscriptionTier) {
+      showInfo("Already on this plan", "Choose a different plan to switch")
+      return
+    }
+
+    try {
+      setChangingPlan(true)
+      const result = await generatePlanCheckoutLink({
+        tier: selectedTier,
+        origin: window.location.origin,
+        successUrl: `${window.location.origin}/dashboard/billing`,
+      })
+      window.location.href = result.url
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to start checkout"
+      showError("Plan change failed", message)
+      setChangingPlan(false)
+    }
+  }
+
+  const openBillingPortal = async () => {
+    try {
+      setOpeningPortal(true)
+      const result = await generateCustomerPortalUrl({})
+      window.location.href = result.url
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to open billing portal"
+      showError("Billing portal failed", message)
+      setOpeningPortal(false)
+    }
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-32">
       <div>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
-          Billing & Credits
-        </h1>
+        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Billing & Credits</h1>
         <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-          Manage your subscription, track credit usage, and view invoices.
+          Manage your subscription, buy credit packs, and monitor account usage.
         </p>
       </div>
 
-      {/* Top Row: Credit Balance + Current Plan */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <CreditBalanceCard />
-        <CurrentPlanCard />
+        <CreditBalanceCard
+          total={balance.total}
+          allocation={balance.allocation}
+          selectedPack={selectedPack}
+          onPackChange={setSelectedPack}
+          onBuyCredits={startTopUpCheckout}
+          buying={buyingCredits}
+        />
+        <CurrentPlanCard
+          tier={user.subscriptionTier}
+          maxBrands={user.maxBrands}
+          allocation={balance.allocation}
+          maxSocialAccounts={user.maxSocialAccounts}
+          renewalDate={balance.renewalDate}
+          selectedTier={selectedTier}
+          onTierChange={setSelectedTier}
+          onChangePlan={startPlanCheckout}
+          onManageBilling={openBillingPortal}
+          changingPlan={changingPlan}
+          openingPortal={openingPortal}
+        />
       </div>
 
-      {/* Usage Breakdown */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Usage</p>
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Usage Breakdown</h3>
-        <UsageTabs />
+        <UsageTabs
+          transactions={transactions}
+          dailyUsage={dailyUsage}
+          maxBrands={user.maxBrands}
+          maxSocialAccounts={user.maxSocialAccounts}
+          socialUsed={connectedAccounts.length}
+        />
       </div>
 
       <Separator />
 
-      {/* Billing History */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Invoices</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Billing History</h3>
-        <DS2DataTable columns={invoiceColumns} data={MOCK_BILLING_HISTORY} />
+        <h3 className="sb-h3 mb-3" style={{ color: "#eaeef1" }}>Billing History</h3>
+        <Card>
+          <CardContent>
+            <p className="sb-body-sm" style={{ color: "#6d8d9f", marginBottom: 12 }}>
+              Invoices are available in your Polar customer portal.
+            </p>
+            <div className="flex items-center gap-2">
+              <Label className="sb-caption" style={{ color: "#6d8d9f" }}>Need an invoice PDF?</Label>
+              <Button className="sb-btn-secondary" onClick={openBillingPortal} disabled={openingPortal}>
+                {openingPortal ? "Opening..." : "Open Billing Portal"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
