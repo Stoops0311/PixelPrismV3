@@ -12,6 +12,9 @@ import { DS2Spinner } from "@/components/ds2/spinner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { InstagramIcon, Facebook02Icon, Link04Icon, Add01Icon } from "@hugeicons/core-free-icons"
 import { showError, showSuccess } from "@/components/ds2/toast"
+import { UpgradeDialog } from "@/components/ds2/upgrade-dialog"
+import { useUpgradeDialog } from "@/hooks/use-upgrade-dialog"
+import type { SubscriptionTier } from "@/lib/polar"
 
 type ConnectOption = {
   id: string
@@ -94,6 +97,7 @@ export default function SocialAccountsSettingsPage() {
 
   const [connecting, setConnecting] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
+  const upgrade = useUpgradeDialog()
 
   const connectedCount = useMemo(
     () => (accounts ?? []).filter((acc) => acc.status === "connected").length,
@@ -119,6 +123,11 @@ export default function SocialAccountsSettingsPage() {
   }
 
   const handleConnect = async (option: ConnectOption) => {
+    if (connectedCount >= maxAccounts) {
+      upgrade.showUpgrade({ kind: "social_accounts", currentCount: connectedCount, maxCount: maxAccounts })
+      return
+    }
+
     try {
       setConnecting(option.id)
 
@@ -189,7 +198,7 @@ export default function SocialAccountsSettingsPage() {
               <Button
                 className="sb-btn-primary w-full"
                 onClick={() => handleConnect(option)}
-                disabled={connecting !== null || connectedCount >= maxAccounts}
+                disabled={connecting !== null}
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} className="mr-2" />
                 {connecting === option.id ? "Connecting..." : "Connect"}
@@ -248,6 +257,13 @@ export default function SocialAccountsSettingsPage() {
           )}
         </div>
       </div>
+
+      <UpgradeDialog
+        open={upgrade.open}
+        onOpenChange={upgrade.onOpenChange}
+        context={upgrade.context}
+        currentTier={(currentUser?.subscriptionTier ?? "free") as SubscriptionTier}
+      />
     </div>
   )
 }

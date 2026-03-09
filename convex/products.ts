@@ -57,6 +57,7 @@ export const create = mutation({
     name: v.string(),
     description: v.string(),
     gradientPreview: v.optional(v.string()),
+    colorGrid: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
@@ -71,6 +72,7 @@ export const create = mutation({
       name: args.name,
       description: args.description,
       gradientPreview: args.gradientPreview,
+      colorGrid: args.colorGrid,
       referenceImagesCount: 0,
       generatedImagesCount: 0,
       creditsSpent: 0,
@@ -92,6 +94,7 @@ export const update = mutation({
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     gradientPreview: v.optional(v.string()),
+    colorGrid: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
@@ -104,6 +107,7 @@ export const update = mutation({
     if (args.name !== undefined) updates.name = args.name
     if (args.description !== undefined) updates.description = args.description
     if (args.gradientPreview !== undefined) updates.gradientPreview = args.gradientPreview
+    if (args.colorGrid !== undefined) updates.colorGrid = args.colorGrid
 
     await ctx.db.patch(args.productId, updates)
   },

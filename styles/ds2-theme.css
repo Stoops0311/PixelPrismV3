@@ -599,6 +599,88 @@
   background: linear-gradient(to top, rgba(232, 84, 84, 0.25), transparent);
 }
 
+/* ── Week Strip ─────────────────────────────────────────────────────────── */
+
+.sb-week-col {
+  transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+.sb-week-col:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.20), 0 2px 4px rgba(0,0,0,0.10);
+}
+.sb-week-col:active {
+  transform: translateY(1px);
+}
+.sb-week-strip:hover .sb-week-col:not(:hover) {
+  opacity: 0.85;
+}
+
+.sb-post-chip {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.sb-post-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(244,185,100,0.22);
+}
+
+/* ── Timeline Spine ────────────────────────────────────────────────────── */
+
+.sb-timeline-spine {
+  position: relative;
+  padding-left: 32px;
+}
+.sb-timeline-spine::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(244,185,100,0.08);
+}
+.sb-timeline-dot {
+  position: absolute;
+  left: 8px;
+  width: 6px;
+  height: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* ── Post Row Hover ────────────────────────────────────────────────────── */
+
+.sb-post-row {
+  position: relative;
+  transition: background 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+.sb-post-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #f4b964;
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.sb-post-row:hover::before {
+  transform: scaleY(1);
+}
+.sb-post-row:hover {
+  background: rgba(244,185,100,0.04);
+}
+.sb-post-row-group:hover .sb-post-row:not(:hover) {
+  opacity: 0.85;
+}
+
 /* ── Keyframe Animations ─────────────────────────────────────────────────── */
 
 @keyframes sb-toast-flash {
@@ -658,6 +740,16 @@
 @keyframes sb-empty-pulse {
   0%, 100% { border-color: rgba(244,185,100,0.08); }
   50%      { border-color: rgba(244,185,100,0.14); }
+}
+
+@keyframes sb-tier-card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sb-tier-highlight {
+  0%, 100% { border-color: rgba(244, 185, 100, 0.40); }
+  50%      { border-color: rgba(244, 185, 100, 0.60); }
 }
 
 /* ── Square Bouncing Dots Spinner ────────────────────────────────────────── */
@@ -1542,4 +1634,30 @@
 }
 .sb-best-post-card [data-slot="card"] {
   animation: sb-best-post-shimmer 4s ease-in-out infinite;
+}
+
+/* ── Product Multi-Select ────────────────────────────────────────────── */
+
+.sb-multi-select-item:hover {
+  background: rgba(244,185,100,0.06) !important;
+  box-shadow: inset 3px 0 0 #f4b964;
+}
+
+/* ── Chip Keyframes ──────────────────────────────────────────────────── */
+
+@keyframes sb-chip-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes sb-chip-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.85); }
+}
+
+/* ── Popover Entrance ────────────────────────────────────────────────── */
+
+@keyframes sb-popover-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }

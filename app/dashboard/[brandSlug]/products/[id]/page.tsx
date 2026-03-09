@@ -93,6 +93,7 @@ export default function ProductDetailPage() {
   const productId = params.id as Id<"products">
 
   const product = useQuery(api.products.getById, { productId })
+  const productImages = useQuery(api.productImages.getByProduct, product ? { productId: product._id } : "skip")
   const generatedImages = useQuery(api.images.listByProduct, product ? { productId: product._id } : "skip")
 
   const isLoading = product === undefined
@@ -121,6 +122,7 @@ export default function ProductDetailPage() {
   }
 
   const gradient = product.gradientPreview ?? "linear-gradient(135deg, #1a2a3a 0%, #2a3a4a 50%, #1a3a4a 100%)"
+  const referenceImage = productImages?.[0]
   const imageList = generatedImages ?? []
 
   return (
@@ -138,17 +140,34 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
         {/* Left: Product image (40%) */}
         <div className="md:col-span-2">
-          <div
-            className="w-full flex items-center justify-center"
-            style={{
-              aspectRatio: "1",
-              background: gradient,
-              border: "1px solid rgba(244,185,100,0.12)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.10)",
-            }}
-          >
-            <HugeiconsIcon icon={Image02Icon} size={48} color="rgba(255,255,255,0.2)" />
-          </div>
+          {referenceImage ? (
+            <div
+              className="w-full overflow-hidden"
+              style={{
+                aspectRatio: "1",
+                border: "1px solid rgba(244,185,100,0.12)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.10)",
+              }}
+            >
+              <img
+                src={referenceImage.imageUrl}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div
+              className="w-full flex items-center justify-center"
+              style={{
+                aspectRatio: "1",
+                background: gradient,
+                border: "1px solid rgba(244,185,100,0.12)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.10)",
+              }}
+            >
+              <HugeiconsIcon icon={Image02Icon} size={48} color="rgba(255,255,255,0.2)" />
+            </div>
+          )}
         </div>
 
         {/* Right: Product info (60%) */}

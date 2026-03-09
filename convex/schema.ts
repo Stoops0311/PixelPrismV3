@@ -92,6 +92,7 @@ export default defineSchema({
     name: v.string(),
     description: v.string(),
     gradientPreview: v.optional(v.string()),
+    colorGrid: v.optional(v.array(v.string())),
 
     // Stats
     referenceImagesCount: v.number(),

@@ -94,7 +94,7 @@ export interface Product {
   imageCount: number
   creditsSpent: number
   createdAt: string
-  gradient: string
+  colorGrid: string[]
 }
 
 export interface ChatMessage {
@@ -119,7 +119,7 @@ export interface GenerationConfig {
   quality: "standard" | "hd" | "ultra"
   aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"
   quantity: number
-  productId?: string
+  productIds?: string[]
   referenceImageId?: string
 }
 
@@ -128,7 +128,7 @@ export interface GeneratedImage {
   productId?: string
   productName?: string
   imageUrl?: string
-  gradient: string
+  colorGrid: string[]
   aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"
   status: "generating" | "ready" | "failed"
   errorMessage?: string
@@ -148,7 +148,7 @@ export interface MiniCalendarPost {
 
 export interface RecentStudioImage {
   id: string
-  gradient: string
+  colorGrid: string[]
   imageUrl?: string
   productName?: string
   aspectRatio: "1:1" | "16:9" | "9:16" | "3:4" | "4:3" | "3:2"

@@ -138,6 +138,7 @@ export const createBatch = mutation({
     ),
     quantity: v.number(),
     productId: v.optional(v.id("products")),
+    referenceImageId: v.optional(v.id("generatedImages")),
     stylePreset: v.optional(v.string()),
     negativePrompt: v.optional(v.string()),
     seed: v.optional(v.number()),
@@ -197,6 +198,14 @@ export const createBatch = mutation({
         )
         .collect()
       referenceImageUrls = productImages.map((img) => img.imageUrl)
+    }
+
+    // Prepend user-selected reference image if provided
+    if (args.referenceImageId) {
+      const refImage = await ctx.db.get(args.referenceImageId)
+      if (refImage && refImage.userId === user._id && refImage.imageUrl) {
+        referenceImageUrls = [refImage.imageUrl, ...referenceImageUrls]
+      }
     }
 
     // Deduct credits

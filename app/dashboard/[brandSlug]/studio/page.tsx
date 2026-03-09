@@ -13,6 +13,7 @@ import {
   Menu01Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   Select,
   SelectContent,
@@ -20,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,32 +29,15 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DS2DataTable, type DS2Column } from "@/components/ds2/data-table"
 import { StatusBadge } from "@/components/ds2/status-badge"
+import { ColorGrid } from "@/components/ds2/color-grid"
+import { ProductMultiSelect } from "@/components/ds2/product-multi-select"
 import { ImageGenerationPanel } from "@/components/ds2/image-generation-panel"
 import { MasonryGallery } from "@/components/ds2/masonry-gallery"
 import { DS2Spinner } from "@/components/ds2/spinner"
 import { showSuccess, showInfo, showError } from "@/components/ds2/toast"
 import type { GeneratedImage, GenerationConfig, Product } from "@/types/dashboard"
 
-// ── Gradient generation for images without URLs ─────────────────────────
-
-const GRADIENT_PALETTE = [
-  "linear-gradient(135deg, #1a3a4a 0%, #2a5a3a 50%, #1a4a3a 100%)",
-  "linear-gradient(135deg, #3a2a1a 0%, #5a3a2a 50%, #4a2a1a 100%)",
-  "linear-gradient(135deg, #2a2a3a 0%, #3a3a5a 50%, #2a2a4a 100%)",
-  "linear-gradient(135deg, #4a3a1a 0%, #6a4a2a 50%, #5a3a1a 100%)",
-  "linear-gradient(135deg, #1a2a3a 0%, #2a4a5a 50%, #1a3a4a 100%)",
-  "linear-gradient(135deg, #2a3a2a 0%, #3a5a3a 50%, #2a4a2a 100%)",
-  "linear-gradient(135deg, #3a2a3a 0%, #4a3a5a 50%, #3a2a4a 100%)",
-  "linear-gradient(135deg, #2a4a3a 0%, #1a5a4a 50%, #2a3a4a 100%)",
-]
-
-function hashGradient(id: string): string {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) {
-    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
-  }
-  return GRADIENT_PALETTE[Math.abs(hash) % GRADIENT_PALETTE.length]
-}
+import { hashColorGrid } from "@/lib/color-grid"
 
 // ── Status map for badge rendering ──────────────────────────────────────
 
@@ -78,19 +61,16 @@ function buildListColumns(
     {
       key: "thumbnail",
       label: "",
-      render: (_: unknown, row: GeneratedImage) => (
-        <div
-          className="flex items-center justify-center"
-          style={{
-            width: 48,
-            height: 48,
-            background: row.gradient,
-            border: "1px solid rgba(244,185,100,0.12)",
-          }}
-        >
-          <HugeiconsIcon icon={Image02Icon} size={14} color="rgba(255,255,255,0.2)" />
-        </div>
-      ),
+      render: (_: unknown, row: GeneratedImage) =>
+        row.imageUrl ? (
+          <img
+            src={row.imageUrl}
+            alt=""
+            style={{ width: 48, height: 48, objectFit: "cover", display: "block" }}
+          />
+        ) : (
+          <ColorGrid colors={row.colorGrid} size={48} />
+        ),
     },
     {
       key: "productName",
@@ -160,6 +140,7 @@ export default function StudioPage() {
   const rawProducts = useQuery(api.products.listByBrand, brand ? { brandId: brand._id } : "skip")
   const rawImages = useQuery(api.images.listByBrand, brand ? { brandId: brand._id } : "skip")
   const balance = useQuery(api.credits.getBalance)
+  const user = useQuery(api.users.current)
   const createBatch = useMutation(api.images.createBatch)
   const removeImage = useMutation(api.images.remove)
 
@@ -173,7 +154,7 @@ export default function StudioPage() {
       imageCount: p.generatedImagesCount,
       creditsSpent: p.creditsSpent,
       createdAt: new Date(p.createdAt).toISOString(),
-      gradient: p.gradientPreview || hashGradient(p._id),
+      colorGrid: p.colorGrid ?? hashColorGrid(p._id),
     }))
   }, [rawProducts])
 
@@ -196,7 +177,7 @@ export default function StudioPage() {
       productId: img.productId,
       productName: img.productId ? productNameMap[img.productId] : undefined,
       imageUrl: img.imageUrl,
-      gradient: hashGradient(img._id),
+      colorGrid: hashColorGrid(img._id),
       aspectRatio: img.aspectRatio as GeneratedImage["aspectRatio"],
       status: img.status as GeneratedImage["status"],
       errorMessage: img.errorMessage,
@@ -218,7 +199,7 @@ export default function StudioPage() {
   const [isDragging, setIsDragging] = useState(false)
 
   // Filter state
-  const [filterProduct, setFilterProduct] = useState<string>("all")
+  const [filterProductIds, setFilterProductIds] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -226,8 +207,8 @@ export default function StudioPage() {
   // Filtered images
   const filteredImages = useMemo(() => {
     let images = [...allImages]
-    if (filterProduct !== "all") {
-      images = images.filter((img) => img.productId === filterProduct)
+    if (filterProductIds.length > 0) {
+      images = images.filter((img) => img.productId && filterProductIds.includes(img.productId))
     }
     if (filterStatus !== "all") {
       images = images.filter((img) => img.status === filterStatus)
@@ -244,7 +225,7 @@ export default function StudioPage() {
       )
     }
     return images
-  }, [allImages, filterProduct, filterStatus, sortBy])
+  }, [allImages, filterProductIds, filterStatus, sortBy])
 
   // Generation handler — calls Convex mutation
   const handleGenerate = useCallback(async (config: GenerationConfig) => {
@@ -271,7 +252,8 @@ export default function StudioPage() {
         qualityTier: config.quality === "hd" ? "mid" : config.quality === "ultra" ? "premium" : "standard",
         aspectRatio: config.aspectRatio,
         quantity: config.quantity,
-        productId: config.productId as Id<"products"> | undefined,
+        productId: (config.productIds?.[0] ?? undefined) as Id<"products"> | undefined,
+        referenceImageId: config.referenceImageId ? (config.referenceImageId as Id<"generatedImages">) : undefined,
         stylePreset: config.stylePreset || undefined,
       })
 
@@ -353,7 +335,7 @@ export default function StudioPage() {
   }, [removeImage])
 
   const handleClearFilters = useCallback(() => {
-    setFilterProduct("all")
+    setFilterProductIds([])
     setFilterStatus("all")
     setSortBy("newest")
   }, [])
@@ -371,7 +353,7 @@ export default function StudioPage() {
   )
 
   const hasActiveFilters =
-    filterProduct !== "all" || filterStatus !== "all"
+    filterProductIds.length > 0 || filterStatus !== "all"
 
   // ── Loading state ───────────────────────────────────────────────────
   if (brand === undefined || rawProducts === undefined || rawImages === undefined || balance === undefined) {
@@ -418,6 +400,9 @@ export default function StudioPage() {
           referenceImage={referenceImage}
           onReferenceImageChange={setReferenceImage}
           isDragging={isDragging}
+          brandId={brand._id}
+          currentTier={user?.subscriptionTier ?? "free"}
+          galleryImages={allImages}
         />
       </div>
 
@@ -432,22 +417,12 @@ export default function StudioPage() {
           style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}
         >
           {/* Product filter */}
-          <Select value={filterProduct} onValueChange={setFilterProduct}>
-            <SelectTrigger
-              className="w-[180px]"
-              style={{ minHeight: 40, fontSize: 13 }}
-            >
-              <SelectValue placeholder="All Products" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Products</SelectItem>
-              {products.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ProductMultiSelect
+            products={products}
+            selectedIds={filterProductIds}
+            onSelectionChange={setFilterProductIds}
+            variant="filter"
+          />
 
           {/* Status filter */}
           <ToggleGroup

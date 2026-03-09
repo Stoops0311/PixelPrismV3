@@ -58,6 +58,50 @@ export const listByBrand = query({
   },
 })
 
+export const listUpcoming = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx)
+    const limit = args.limit ?? 20
+    const now = Date.now()
+    const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000
+
+    const posts = await ctx.db
+      .query("scheduledPosts")
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+      .collect()
+
+    const upcoming = posts
+      .filter(
+        (p) =>
+          (p.status === "scheduled" || p.status === "draft") &&
+          p.scheduledFor &&
+          p.scheduledFor >= now &&
+          p.scheduledFor <= sevenDaysFromNow
+      )
+      .sort((a, b) => (a.scheduledFor ?? 0) - (b.scheduledFor ?? 0))
+      .slice(0, limit)
+
+    const brandIds = [...new Set(upcoming.map((p) => p.brandId))]
+    const brands = await Promise.all(brandIds.map((id) => ctx.db.get(id)))
+    const brandMap = Object.fromEntries(
+      brands.filter(Boolean).map((b: any) => [b._id, b])
+    )
+
+    return upcoming.map((post) => ({
+      ...post,
+      brandName: (brandMap[post.brandId as string]?.name as string) ?? "Unknown",
+      brandSlug: (brandMap[post.brandId as string]?.slug as string) ?? "",
+      brandInitials: ((brandMap[post.brandId as string]?.name as string) ?? "?")
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2),
+    }))
+  },
+})
+
 export const create = mutation({
   args: {
     brandId: v.id("brands"),

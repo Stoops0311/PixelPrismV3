@@ -6,28 +6,35 @@ import {
   Image02Icon,
   Cancel01Icon,
   ArrowRight02Icon,
+  MagicWand01Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { showInfo } from "@/components/ds2/toast"
+import { ColorGrid } from "@/components/ds2/color-grid"
+import { ProductMultiSelect } from "@/components/ds2/product-multi-select"
+import { AddProductDialog } from "@/components/ds2/add-product-dialog"
+import { UpgradeDialog } from "@/components/ds2/upgrade-dialog"
+import { useUpgradeDialog } from "@/hooks/use-upgrade-dialog"
+import type { SubscriptionTier } from "@/lib/polar"
+import type { Id } from "@/convex/_generated/dataModel"
 import type { Product, GeneratedImage, GenerationConfig } from "@/types/dashboard"
 
 // ── Style options ───────────────────────────────────────────────────────
 
 const STYLE_OPTIONS = [
-  { id: "none", label: "None", gradient: "linear-gradient(135deg, #1a2530, #0d1a24)", promptSuffix: "" },
-  { id: "product-shot", label: "Product Shot", gradient: "linear-gradient(135deg, #2a3a4a, #1a2a3a)", promptSuffix: ", professional product photography, studio lighting, clean background, high detail, commercial quality, sharp focus" },
-  { id: "lifestyle", label: "Lifestyle", gradient: "linear-gradient(135deg, #3a4a2a, #2a3a1a)", promptSuffix: ", lifestyle photography, natural lighting, soft focus, warm tones, cozy atmosphere, candid feel" },
-  { id: "flat-lay", label: "Flat Lay", gradient: "linear-gradient(135deg, #4a3a2a, #3a2a1a)", promptSuffix: ", flat lay photography, top-down view, organized arrangement, minimalist composition, clean styling" },
-  { id: "abstract", label: "Abstract", gradient: "linear-gradient(135deg, #3a2a4a, #2a1a3a)", promptSuffix: ", abstract art style, vibrant colors, geometric shapes, artistic interpretation, creative composition" },
+  { id: "none", label: "None", image: null, gradient: "linear-gradient(135deg, #1a2530, #0d1a24)", promptSuffix: "" },
+  { id: "product-shot", label: "Product Shot", image: "/style-previews/product-shot.png", gradient: "linear-gradient(135deg, #2a3a4a, #1a2a3a)", promptSuffix: ", professional product photography, studio lighting, clean background, high detail, commercial quality, sharp focus" },
+  { id: "lifestyle", label: "Lifestyle", image: "/style-previews/lifestyle.png", gradient: "linear-gradient(135deg, #3a4a2a, #2a3a1a)", promptSuffix: ", lifestyle photography, natural lighting, soft focus, warm tones, cozy atmosphere, candid feel" },
+  { id: "flat-lay", label: "Flat Lay", image: "/style-previews/flat-lay.png", gradient: "linear-gradient(135deg, #4a3a2a, #3a2a1a)", promptSuffix: ", flat lay photography, top-down view, organized arrangement, minimalist composition, clean styling" },
+  { id: "abstract", label: "Abstract", image: "/style-previews/abstract.png", gradient: "linear-gradient(135deg, #3a2a4a, #2a1a3a)", promptSuffix: ", abstract art style, vibrant colors, geometric shapes, artistic interpretation, creative composition" },
 ]
 
 const QUALITY_OPTIONS = [
@@ -52,6 +59,9 @@ interface ImageGenerationPanelProps {
   referenceImage: GeneratedImage | null
   onReferenceImageChange: (image: GeneratedImage | null) => void
   isDragging?: boolean
+  brandId?: Id<"brands">
+  currentTier?: SubscriptionTier
+  galleryImages?: GeneratedImage[]
 }
 
 export function ImageGenerationPanel({
@@ -64,9 +74,12 @@ export function ImageGenerationPanel({
   referenceImage,
   onReferenceImageChange,
   isDragging = false,
+  brandId,
+  currentTier = "free",
+  galleryImages = [],
 }: ImageGenerationPanelProps) {
-  const [selectedProductId, setSelectedProductId] = useState<string>(
-    preSelectedProduct?.id ?? "none"
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(
+    preSelectedProduct ? [preSelectedProduct.id] : []
   )
   const [prompt, setPrompt] = useState("")
   const [selectedStyle, setSelectedStyle] = useState("none")
@@ -77,6 +90,9 @@ export function ImageGenerationPanel({
   const [flashStyle, setFlashStyle] = useState<string | null>(null)
   const [costFlash, setCostFlash] = useState(false)
   const [referenceGlow, setReferenceGlow] = useState(false)
+  const [newProductDialogOpen, setNewProductDialogOpen] = useState(false)
+  const [refPickerOpen, setRefPickerOpen] = useState(false)
+  const upgrade = useUpgradeDialog()
   const dropZoneHintRef = useRef(false)
   const prevCostRef = useRef(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -84,7 +100,7 @@ export function ImageGenerationPanel({
   // Pre-select product from URL
   useEffect(() => {
     if (preSelectedProduct) {
-      setSelectedProductId(preSelectedProduct.id)
+      setSelectedProductIds([preSelectedProduct.id])
     }
   }, [preSelectedProduct])
 
@@ -135,10 +151,10 @@ export function ImageGenerationPanel({
       quality,
       aspectRatio,
       quantity,
-      productId: selectedProductId === "none" ? undefined : selectedProductId,
+      productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
       referenceImageId: referenceImage?.id,
     })
-  }, [prompt, selectedStyle, selectedStyleOption, quality, aspectRatio, quantity, selectedProductId, referenceImage, onGenerate])
+  }, [prompt, selectedStyle, selectedStyleOption, quality, aspectRatio, quantity, selectedProductIds, referenceImage, onGenerate])
 
   // Drop zone handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -216,14 +232,29 @@ export function ImageGenerationPanel({
                     : undefined,
                 }}
               >
-                <div
-                  style={{
-                    height: 48,
-                    background: style.gradient,
-                    marginBottom: 6,
-                    border: "1px solid rgba(244,185,100,0.06)",
-                  }}
-                />
+                {style.image ? (
+                  <img
+                    src={style.image}
+                    alt={style.label}
+                    style={{
+                      height: 48,
+                      width: "100%",
+                      objectFit: "cover",
+                      marginBottom: 6,
+                      border: "1px solid rgba(244,185,100,0.06)",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: 48,
+                      background: style.gradient,
+                      marginBottom: 6,
+                      border: "1px solid rgba(244,185,100,0.06)",
+                    }}
+                  />
+                )}
                 <span
                   className="sb-caption"
                   style={{ color: isSelected ? "#eaeef1" : "#6d8d9f" }}
@@ -242,32 +273,23 @@ export function ImageGenerationPanel({
       {/* Product selector */}
       <div>
         <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
-          Product (optional)
+          Products (optional)
         </label>
-        <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a product..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No product — Brand image</SelectItem>
-            {products.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                <span className="flex items-center gap-2">
-                  <span
-                    className="inline-block shrink-0"
-                    style={{
-                      width: 20,
-                      height: 20,
-                      background: p.gradient,
-                      border: "1px solid rgba(244,185,100,0.12)",
-                    }}
-                  />
-                  {p.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ProductMultiSelect
+          products={products}
+          selectedIds={selectedProductIds}
+          onSelectionChange={setSelectedProductIds}
+          variant="form"
+          onAddProduct={() => setNewProductDialogOpen(true)}
+        />
+        <AddProductDialog
+          brandId={brandId}
+          open={newProductDialogOpen}
+          onOpenChange={setNewProductDialogOpen}
+          onCreated={(productId) => {
+            setSelectedProductIds((prev) => [...prev, productId])
+          }}
+        />
       </div>
 
       {/* Reference image drop zone */}
@@ -288,9 +310,7 @@ export function ImageGenerationPanel({
               className="w-full flex items-center justify-center"
               style={{
                 height: 120,
-                background: referenceImage.imageUrl
-                  ? undefined
-                  : referenceImage.gradient,
+                background: referenceImage.imageUrl ? undefined : "#071a26",
                 border: "1px solid rgba(244,185,100,0.22)",
                 overflow: "hidden",
               }}
@@ -326,6 +346,7 @@ export function ImageGenerationPanel({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={() => setRefPickerOpen(true)}
             className="flex items-center justify-center gap-2 cursor-pointer"
             style={{
               height: 80,
@@ -347,13 +368,83 @@ export function ImageGenerationPanel({
             <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
               {isDragOver
                 ? "Drop here to use as reference"
-                : "Drop an image here or click to browse"}
+                : "Drag from gallery or click to browse"}
             </p>
             {!isDragOver && (
               <HugeiconsIcon icon={ArrowRight02Icon} size={14} color="#6d8d9f" />
             )}
           </div>
         )}
+
+        {/* Reference image picker dialog */}
+        <Dialog open={refPickerOpen} onOpenChange={setRefPickerOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="sb-h4" style={{ color: "#eaeef1" }}>
+                Choose Reference Image
+              </DialogTitle>
+            </DialogHeader>
+            {galleryImages.filter((img) => img.status === "ready" && img.imageUrl).length > 0 ? (
+              <div
+                className="grid grid-cols-3 gap-2 max-h-[360px] overflow-y-auto"
+                style={{ padding: "4px 0" }}
+              >
+                {galleryImages
+                  .filter((img) => img.status === "ready" && img.imageUrl)
+                  .map((img) => (
+                    <button
+                      key={img.id}
+                      className="cursor-pointer group relative"
+                      onClick={() => {
+                        onReferenceImageChange(img)
+                        setRefPickerOpen(false)
+                        setReferenceGlow(true)
+                        setTimeout(() => setReferenceGlow(false), 600)
+                        showInfo("Reference image set", "New generations will use this style")
+                      }}
+                      style={{
+                        border: "1px solid rgba(244,185,100,0.08)",
+                        background: "#071a26",
+                        padding: 0,
+                        overflow: "hidden",
+                        transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      }}
+                    >
+                      <img
+                        src={img.imageUrl!}
+                        alt={img.productName || "Generated image"}
+                        style={{
+                          width: "100%",
+                          aspectRatio: "1 / 1",
+                          objectFit: "cover",
+                          display: "block",
+                          opacity: 0.85,
+                          transition: "opacity 200ms ease",
+                        }}
+                        className="group-hover:opacity-100"
+                      />
+                      <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200"
+                        style={{ background: "rgba(7,26,38,0.5)" }}
+                      >
+                        <HugeiconsIcon icon={MagicWand01Icon} size={20} color="#f4b964" />
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <HugeiconsIcon icon={Image02Icon} size={32} color="rgba(244,185,100,0.3)" />
+                <p className="sb-body-sm mt-3" style={{ color: "#6d8d9f" }}>
+                  No generated images yet
+                </p>
+                <p className="sb-caption mt-1" style={{ color: "#4a6a7a" }}>
+                  Generate some images first, then use them as references
+                </p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Separator */}
@@ -491,21 +582,44 @@ export function ImageGenerationPanel({
         </div>
       </div>
 
-      {/* Generate button */}
-      <div className="relative">
-        <Button
-          className="sb-btn-primary w-full"
-          disabled={insufficientCredits || isGenerating || !prompt.trim()}
-          onClick={handleGenerate}
-        >
-          {isGenerating ? "Generating..." : "Generate"}
-        </Button>
-        {isGenerating && (
-          <div className="absolute bottom-0 left-0 right-0">
-            <Progress value={generationProgress} />
-          </div>
+      {/* Generate / Get More Credits buttons */}
+      <div className="flex gap-3">
+        {insufficientCredits && (
+          <Button
+            className="sb-btn-secondary flex-1"
+            onClick={() =>
+              upgrade.showUpgrade({
+                kind: "credits",
+                creditsNeeded: totalCost,
+                creditsAvailable: availableCredits,
+              })
+            }
+          >
+            Get More Credits
+          </Button>
         )}
+        <div className={`relative ${insufficientCredits ? "flex-1" : "w-full"}`}>
+          <Button
+            className="sb-btn-primary w-full"
+            disabled={insufficientCredits || isGenerating || !prompt.trim()}
+            onClick={handleGenerate}
+          >
+            {isGenerating ? "Generating..." : "Generate"}
+          </Button>
+          {isGenerating && (
+            <div className="absolute bottom-0 left-0 right-0">
+              <Progress value={generationProgress} />
+            </div>
+          )}
+        </div>
       </div>
+
+      <UpgradeDialog
+        open={upgrade.open}
+        onOpenChange={upgrade.onOpenChange}
+        context={upgrade.context}
+        currentTier={currentTier}
+      />
     </div>
   )
 }

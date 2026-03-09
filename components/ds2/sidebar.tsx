@@ -83,24 +83,13 @@ export function AppSidebar({
         <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-1"}`}>
           <div className={`flex items-center ${collapsed ? "" : "gap-3"}`}>
             {/* Logo mark */}
-            <div
-              className="w-8 h-8 shrink-0 flex items-center justify-center"
-              style={{
-                background: "#f4b964",
-                boxShadow: "0 0 12px rgba(244, 185, 100, 0.25)",
-              }}
-            >
-              <span
-                style={{
-                  color: "#071a26",
-                  fontFamily: "'Neue Montreal', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "14px",
-                }}
-              >
-                P
-              </span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/main-logo-no-text.png"
+              alt="PixelPrism"
+              className="w-8 h-8 shrink-0"
+              style={{ objectFit: "contain" }}
+            />
             {!collapsed && (
               <span
                 className="sb-h4 truncate"

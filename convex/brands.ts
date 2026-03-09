@@ -135,7 +135,7 @@ export const create = mutation({
       suffix++
     }
 
-    return await ctx.db.insert("brands", {
+    const brandId = await ctx.db.insert("brands", {
       userId: user._id,
       name: args.name,
       slug: finalSlug,
@@ -158,6 +158,8 @@ export const create = mutation({
       scheduledPostsCount: 0,
       createdAt: Date.now(),
     })
+
+    return { brandId, slug: finalSlug }
   },
 })
 

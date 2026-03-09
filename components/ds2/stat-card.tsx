@@ -27,7 +27,7 @@ function DS2StatCard({
   valueStyle?: React.CSSProperties
 }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
           <p className="sb-label" style={{ color: "#6d8d9f" }}>{label}</p>

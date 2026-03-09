@@ -1,0 +1,383 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Homepage Styles — Mock Panel Infrastructure + Section Layout
+   Studio Brutalist DS-2
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Mock Panel Base ─────────────────────────────────────────────────────── */
+
+.mock-panel {
+  background: #0e2838;
+  border: 1px solid rgba(244, 185, 100, 0.12);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.10);
+}
+
+/* ── Dashboard Shell Layout ──────────────────────────────────────────────── */
+
+.mock-panel-shell {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #071a26;
+}
+
+.mock-sidebar {
+  width: 200px;
+  min-height: 100%;
+  flex-shrink: 0;
+  background: #071a26;
+  border-right: 1px solid rgba(244, 185, 100, 0.08);
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mock-header {
+  height: 48px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(244, 185, 100, 0.08);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: #071a26;
+  gap: 8px;
+}
+
+.mock-content {
+  flex: 1;
+  padding: 20px;
+  background: #071a26;
+  overflow: hidden;
+}
+
+/* ── Sidebar Nav Items ───────────────────────────────────────────────────── */
+
+.mock-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: #6d8d9f;
+  font-size: 12px;
+  font-family: 'General Sans', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  border-left: 2px solid transparent;
+  cursor: default;
+  user-select: none;
+}
+
+.mock-nav-item.active {
+  color: #eaeef1;
+  background: rgba(244, 185, 100, 0.06);
+  border-left-color: #f4b964;
+}
+
+/* ── Stat Cards ──────────────────────────────────────────────────────────── */
+
+.mock-stat-card {
+  background: #0e2838;
+  border: 1px solid rgba(244, 185, 100, 0.12);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.10);
+}
+
+/* ── Calendar Post Chips ─────────────────────────────────────────────────── */
+
+.mock-post-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 10px;
+  background: rgba(244, 185, 100, 0.03);
+  border-left: 2px solid transparent;
+  font-family: 'General Sans', sans-serif;
+}
+
+/* ── Image Thumbnails ────────────────────────────────────────────────────── */
+
+.mock-img-thumb {
+  aspect-ratio: 1;
+  background: #163344;
+  border: 1px solid rgba(244, 185, 100, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Progress Bars ───────────────────────────────────────────────────────── */
+
+.mock-progress-bar {
+  height: 4px;
+  background: rgba(244, 185, 100, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.mock-progress-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: #f4b964;
+}
+
+/* ── Status Badges ───────────────────────────────────────────────────────── */
+
+.mock-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-family: 'Neue Montreal', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+/* ── Section Containers ──────────────────────────────────────────────────── */
+
+.hp-section {
+  width: 100%;
+  position: relative;
+}
+
+.hp-section-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ── Spotlight Overlay ───────────────────────────────────────────────────── */
+
+.mock-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 30%,
+    rgba(7, 26, 38, 0.75) 100%
+  );
+  opacity: 1;
+  transition: opacity 300ms ease;
+  z-index: 2;
+}
+
+/* ── Showcase Callout Card ───────────────────────────────────────────────── */
+
+.showcase-callout {
+  background: #0e2838;
+  border-left: 3px solid #f4b964;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.20), 0 2px 4px rgba(0, 0, 0, 0.10);
+  min-width: 260px;
+  max-width: 320px;
+}
+
+/* ── Counter Numbers ─────────────────────────────────────────────────────── */
+
+.hp-counter {
+  font-size: 64px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: #f4b964;
+  line-height: 1;
+}
+
+/* ── Pricing Page Responsive ─────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .pricing-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .pricing-card-popular {
+    transform: none !important;
+  }
+
+  /* Tree: hide credits callout absolute position */
+  .tree-credits {
+    position: static !important;
+    transform: none !important;
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pricing-cards-grid {
+    grid-template-columns: 1fr !important;
+    max-width: 400px;
+    margin: 0 auto !important;
+  }
+
+  /* Contact: stack vertically */
+  .contact-layout {
+    flex-direction: column !important;
+  }
+
+  .contact-info-panel {
+    min-width: 100% !important;
+  }
+
+  /* Contact: stack name/email fields */
+  .contact-fields-row {
+    flex-direction: column !important;
+  }
+
+  /* Tree: vertical layout */
+  .tree-section > div > div:last-child {
+    overflow-x: auto;
+  }
+
+  /* Footer: stack on mobile */
+  footer > div {
+    flex-direction: column !important;
+    gap: 16px !important;
+    text-align: center;
+  }
+}
+
+/* ── Mobile Responsiveness ───────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Hide mock sidebar */
+  .mock-panel-shell .mock-sidebar {
+    display: none;
+  }
+
+  /* Problem cards: 3-col → 1-col */
+  .problem-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stats: 4-col → 2-col */
+  .proof-stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Stats: remove right borders, add bottom borders for 2-col layout */
+  .proof-stat-cell {
+    border-right: none !important;
+    border-bottom: 1px solid rgba(244, 185, 100, 0.12) !important;
+  }
+  .proof-stat-cell:nth-child(odd) {
+    border-right: 1px solid rgba(244, 185, 100, 0.12) !important;
+  }
+  .proof-stat-cell:nth-last-child(-n+2) {
+    border-bottom: none !important;
+  }
+
+  /* Stats: smaller counter font */
+  .proof-stat-cell .sb-data {
+    font-size: 44px !important;
+  }
+
+  /* Feature deep-dives: side-by-side → stacked */
+  .feature-row-ai-studio,
+  .feature-row-scheduling,
+  .feature-row-analytics,
+  .feature-row-multi-brand {
+    flex-direction: column !important;
+    gap: 40px !important;
+    padding: 60px 0 !important;
+  }
+
+  .feature-text {
+    flex: none !important;
+    max-width: 100% !important;
+  }
+
+  .feature-mock {
+    max-width: 100% !important;
+  }
+
+  /* Solution showcase: stack vertically on mobile */
+  .solution-pin-container {
+    height: auto !important;
+    flex-direction: column !important;
+    padding: 60px 24px !important;
+  }
+
+  .solution-pin-container > div {
+    flex-direction: column !important;
+    gap: 40px !important;
+    padding: 0 !important;
+  }
+
+  .solution-pin-container > div > div:first-child {
+    width: 100% !important;
+  }
+
+  .solution-dashboard-wrapper {
+    max-width: 100% !important;
+  }
+
+  /* Hero display size */
+  .sb-display {
+    font-size: 52px !important;
+  }
+
+  /* Section padding reductions */
+  .fdd-header {
+    padding: 48px 0 40px !important;
+  }
+
+  /* Feature rows inner wrapper padding */
+  .feature-row-ai-studio > *,
+  .feature-row-scheduling > *,
+  .feature-row-analytics > *,
+  .feature-row-multi-brand > * {
+    flex: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Tighten section horizontal padding */
+  .hp-section-inner {
+    padding: 0 20px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .sb-display {
+    font-size: 40px !important;
+  }
+
+  .sb-h2 {
+    font-size: 26px !important;
+  }
+
+  .proof-stat-cell .sb-data {
+    font-size: 36px !important;
+  }
+}
+
+/* ── Hero scroll hint bounce ─────────────────────────────────────────────── */
+
+@keyframes hero-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.7; }
+  50% { transform: translateX(-50%) translateY(12px); opacity: 1; }
+}
+
+/* ── Generating dot animation ────────────────────────────────────────────── */
+
+@keyframes mock-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.mock-generating-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #f4b964;
+  animation: mock-pulse-dot 1.2s ease-in-out infinite;
+}

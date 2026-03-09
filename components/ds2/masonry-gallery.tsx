@@ -11,17 +11,18 @@ import {
   Alert02Icon,
 } from "@hugeicons/core-free-icons"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { ColorGrid } from "@/components/ds2/color-grid"
 import type { GeneratedImage } from "@/types/dashboard"
 
-// ── Aspect ratio to height map ──────────────────────────────────────────
+// ── Aspect ratio CSS map ────────────────────────────────────────────────
 
-const ASPECT_HEIGHTS: Record<string, number> = {
-  "1:1": 200,
-  "16:9": 140,
-  "9:16": 300,
-  "3:4": 240,
-  "4:3": 170,
-  "3:2": 160,
+const ASPECT_RATIOS: Record<string, string> = {
+  "1:1": "1 / 1",
+  "16:9": "16 / 9",
+  "9:16": "9 / 16",
+  "3:4": "3 / 4",
+  "4:3": "4 / 3",
+  "3:2": "3 / 2",
 }
 
 // ── Props ───────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ function StudioImageCard({
   onDragStart?: () => void
   onDragEnd?: () => void
 }) {
-  const height = ASPECT_HEIGHTS[image.aspectRatio] ?? 200
+  const cssRatio = ASPECT_RATIOS[image.aspectRatio] ?? "1 / 1"
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -74,7 +75,7 @@ function StudioImageCard({
         JSON.stringify({
           id: image.id,
           imageUrl: image.imageUrl,
-          gradient: image.gradient,
+          colorGrid: image.colorGrid,
           aspectRatio: image.aspectRatio,
           productName: image.productName,
         })
@@ -112,36 +113,36 @@ function StudioImageCard({
         <div
           className="relative w-full"
           style={{
-            height: image.imageUrl ? "auto" : height,
-            minHeight: image.imageUrl ? height * 0.5 : height,
-            background: image.imageUrl ? "#071a26" : image.gradient,
+            aspectRatio: image.imageUrl ? undefined : cssRatio,
+            background: "#071a26",
           }}
         >
           {image.imageUrl ? (
             <img
               src={image.imageUrl}
               alt={image.productName || "Generated image"}
-              style={{
-                width: "100%",
-                display: "block",
-              }}
+              style={{ width: "100%", display: "block" }}
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              {isGenerating ? (
-                <DS2Spinner />
-              ) : isFailed ? (
-                <div className="flex flex-col items-center gap-2">
-                  <HugeiconsIcon icon={Alert02Icon} size={24} color="#e85454" />
-                  <span className="sb-caption" style={{ color: "#e85454", maxWidth: 140, textAlign: "center" }}>
-                    {image.errorMessage || "Generation failed"}
-                  </span>
-                </div>
-              ) : (
-                <HugeiconsIcon icon={Image02Icon} size={24} color="rgba(255,255,255,0.15)" />
-              )}
-            </div>
+            <>
+              {/* Color grid fills the placeholder — the PixelPrism moment */}
+              <ColorGrid fill colors={image.colorGrid} className="absolute inset-0" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                {isGenerating ? (
+                  <DS2Spinner />
+                ) : isFailed ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <HugeiconsIcon icon={Alert02Icon} size={24} color="#e85454" />
+                    <span className="sb-caption" style={{ color: "#e85454", maxWidth: 140, textAlign: "center" }}>
+                      {image.errorMessage || "Generation failed"}
+                    </span>
+                  </div>
+                ) : (
+                  <HugeiconsIcon icon={Image02Icon} size={24} color="rgba(255,255,255,0.15)" />
+                )}
+              </div>
+            </>
           )}
 
           {/* Hover action bar — bottom gradient with small icons */}
