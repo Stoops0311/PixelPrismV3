@@ -26,29 +26,37 @@ const TIER_CONFIG = {
   },
 } as const
 
-export const TOP_UP_PACKS = {
-  credits_100: {
-    productId: "2d3d6eff-dffd-46f9-b39b-a9d8057fc071",
-    credits: 100,
-    price: 35,
-  },
-  credits_300: {
-    productId: "17cb86d6-4501-499b-9024-53db81d7d873",
-    credits: 300,
-    price: 90,
-  },
-  credits_1000: {
-    productId: "f7e9b4b8-01d0-4756-af3f-9ba55fe43eeb",
-    credits: 1000,
-    price: 250,
-  },
-} as const
+const IS_PRODUCTION = process.env.POLAR_SERVER === "production"
 
-const TIER_PRODUCT_IDS = {
+// Sandbox product IDs (dev/testing)
+const TIER_PRODUCT_IDS_SANDBOX = {
   starter: "672efa21-55b2-4300-aa9b-c1cee55b89bd",
   professional: "9a52da8d-879c-4810-a867-ff3c405dfc51",
   enterprise: "d0669c49-bf83-485d-bfff-b265ca85895c",
 } as const
+
+const TOP_UP_PACKS_SANDBOX = {
+  credits_100: { productId: "2d3d6eff-dffd-46f9-b39b-a9d8057fc071", credits: 100, price: 35 },
+  credits_300: { productId: "17cb86d6-4501-499b-9024-53db81d7d873", credits: 300, price: 90 },
+  credits_1000: { productId: "f7e9b4b8-01d0-4756-af3f-9ba55fe43eeb", credits: 1000, price: 250 },
+} as const
+
+// Production product IDs
+const TIER_PRODUCT_IDS_PROD = {
+  starter: "0d9f747d-976a-4629-8fb4-5e7851f46a62",
+  professional: "69546893-b2d2-4ff5-8c80-b4a47b735958",
+  enterprise: "5b5c79a3-2fa2-4352-8b09-e41c2a8f4c66",
+} as const
+
+const TOP_UP_PACKS_PROD = {
+  credits_100: { productId: "3ffe69ef-5b1e-4520-ac33-d0d797ef375d", credits: 100, price: 35 },
+  credits_300: { productId: "1f8e438d-0666-4bed-9f84-36a19378dbe8", credits: 300, price: 90 },
+  credits_1000: { productId: "3a902b5b-41ee-4dcb-8eb6-f8978d04d652", credits: 1000, price: 250 },
+} as const
+
+// Active set — driven by POLAR_SERVER env var in Convex dashboard
+const TIER_PRODUCT_IDS = IS_PRODUCTION ? TIER_PRODUCT_IDS_PROD : TIER_PRODUCT_IDS_SANDBOX
+export const TOP_UP_PACKS = IS_PRODUCTION ? TOP_UP_PACKS_PROD : TOP_UP_PACKS_SANDBOX
 
 function resolveTierFromProductId(productId: string) {
   if (productId === TIER_PRODUCT_IDS.starter) return "starter"
@@ -68,7 +76,6 @@ export const polar = new Polar(components.polar, {
     if (!user) throw new Error("Not authenticated")
     return { userId: user._id as string, email: user.email as string }
   },
-  // Product IDs will be updated after sandbox setup
   products: {
     starter: TIER_PRODUCT_IDS.starter,
     professional: TIER_PRODUCT_IDS.professional,
@@ -77,7 +84,7 @@ export const polar = new Polar(components.polar, {
     credits_300: TOP_UP_PACKS.credits_300.productId,
     credits_1000: TOP_UP_PACKS.credits_1000.productId,
   },
-  server: "sandbox",
+  server: IS_PRODUCTION ? "production" : "sandbox",
 })
 
 export const {
