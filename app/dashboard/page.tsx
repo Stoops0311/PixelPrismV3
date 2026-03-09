@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -23,6 +23,7 @@ import { DS2StatCard } from "@/components/ds2/stat-card"
 import { StatusBadge } from "@/components/ds2/status-badge"
 import { DS2EmptyContainer } from "@/components/ds2/empty-container"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { MobileStatStrip } from "@/components/ds2/mobile"
 import type { Brand } from "@/types/dashboard"
 import { format, isSameDay, startOfDay, isToday, isTomorrow, formatDistanceToNow } from "date-fns"
 
@@ -484,19 +485,20 @@ function GlobalOverviewContent() {
 
   if (showEmpty) {
     return (
-      <div className="space-y-32">
+      <div className="px-4 lg:px-0 space-y-10 lg:space-y-32 py-4 lg:py-0">
         {/* A. Greeting */}
         <div suppressHydrationWarning>
-          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
+          <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>
             {getGreeting()}, {firstName}
           </h1>
-          <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-            Welcome to PixelPrism. Let&apos;s get your brand started.
+          <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f" }}>
+            <span className="hidden lg:inline">Welcome to PixelPrism. Let&apos;s get your brand started.</span>
+            <span className="lg:hidden">Let&apos;s get started.</span>
           </p>
         </div>
 
         {/* B. Stat Cards (Empty State) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           <DS2StatCard
             label="Credits Remaining"
             value={credits.toString()}
@@ -597,19 +599,28 @@ function GlobalOverviewContent() {
   }
 
   return (
-    <div className="space-y-32">
+    <div className="px-4 lg:px-0 space-y-10 lg:space-y-32 py-4 lg:py-0">
       {/* A. Greeting */}
       <div suppressHydrationWarning>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
+        <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>
           {getGreeting()}, {firstName}
         </h1>
-        <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-          Here&apos;s what&apos;s happening across your brands.
+        <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f" }}>
+          <span className="hidden lg:inline">Here&apos;s what&apos;s happening across your brands.</span>
+          <span className="lg:hidden">Your brands at a glance.</span>
         </p>
       </div>
 
-      {/* B. Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* B. Stat Cards — mobile strip */}
+      <MobileStatStrip
+        stats={[
+          { label: "Credits", value: credits.toString(), accent: true },
+          { label: "Followers", value: totalFollowers.toLocaleString() },
+          { label: "Engagement", value: `${avgEngagement.toFixed(1)}%` },
+        ]}
+      />
+      {/* B. Stat Cards — desktop grid */}
+      <div className="hidden lg:grid grid-cols-3 gap-6">
         <DS2StatCard
           label="Credits Remaining"
           value={credits.toString()}
@@ -632,8 +643,8 @@ function GlobalOverviewContent() {
       {/* C. Brand Summary Cards */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Portfolio</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Your Brands</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <h3 className="sb-h3 mb-4 lg:mb-6 text-lg lg:text-[22px]" style={{ color: "#eaeef1" }}>Your Brands</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           {brands.map((brand) => (
             <Link key={brand.id} href={`/dashboard/${brand.slug}`}>
               <Card className="cursor-pointer">
@@ -681,14 +692,14 @@ function GlobalOverviewContent() {
       {/* D. Upcoming Posts (Cross-Brand) */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Scheduling</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Upcoming Posts</h3>
+        <h3 className="sb-h3 mb-4 lg:mb-6 text-lg lg:text-[22px]" style={{ color: "#eaeef1" }}>Upcoming Posts</h3>
         <UpcomingPostsFeed posts={forceEmpty ? [] : upcomingPosts} />
       </div>
 
       {/* E. Recent Activity */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Timeline</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Recent Activity</h3>
+        <h3 className="sb-h3 mb-4 lg:mb-6 text-lg lg:text-[22px]" style={{ color: "#eaeef1" }}>Recent Activity</h3>
         <ActivityTimeline activities={forceEmpty ? [] : activities} />
       </div>
     </div>

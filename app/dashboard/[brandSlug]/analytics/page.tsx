@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -22,6 +23,9 @@ import { DS2BarChart } from "@/components/ds2/chart-bar"
 import { DS2DataTable } from "@/components/ds2/data-table"
 import { DS2EmptyContainer } from "@/components/ds2/empty-container"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { MobileStatStrip } from "@/components/ds2/mobile/mobile-stat-strip"
+import { MobileAreaChart, MobileBarChart } from "@/components/ds2/mobile/mobile-chart"
+import { MobileDataCards } from "@/components/ds2/mobile/mobile-data-cards"
 import { showError, showSuccess } from "@/components/ds2/toast"
 import type { DS2Column } from "@/components/ds2/data-table"
 import type { ChartConfig } from "@/components/ui/chart"
@@ -475,18 +479,19 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-32">
+    <div className="px-4 lg:px-0 space-y-10 lg:space-y-32 py-4 lg:py-0">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center gap-3 mb-2">
-          <HugeiconsIcon icon={AnalyticsUpIcon} size={24} color="#f4b964" />
-          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
+        <div className="flex items-center gap-2 lg:gap-3 mb-2">
+          <HugeiconsIcon icon={AnalyticsUpIcon} className="size-5 lg:size-6" color="#f4b964" />
+          <h1 className="text-xl lg:text-[44px] font-bold" style={{ color: "#eaeef1", fontFamily: "'Neue Montreal', sans-serif" }}>
             Analytics
           </h1>
         </div>
-        <p className="sb-body" style={{ color: "#6d8d9f" }}>
-          Follower growth, engagement metrics, and content performance for{" "}
-          <span style={{ color: "#d4dce2" }}>{brand.name}</span>.
+        <p className="text-sm lg:text-base" style={{ color: "#6d8d9f", fontFamily: "'General Sans', sans-serif" }}>
+          <span className="hidden lg:inline">Follower growth, engagement metrics, and content performance for{" "}
+          <span style={{ color: "#d4dce2" }}>{brand.name}</span>.</span>
+          <span className="lg:hidden">{brand.name} performance</span>
         </p>
       </div>
 
@@ -584,87 +589,73 @@ export default function AnalyticsPage() {
             </div>
           </DS2EmptyContainer>
         ) : (
-          <DS2AreaChart
-            data={growthData}
-            series={areaSeries}
-            xAxisKey="date"
-            height={320}
-            config={areaConfig}
-          />
+          <>
+            {/* Desktop chart */}
+            <div className="hidden lg:block">
+              <DS2AreaChart
+                data={growthData}
+                series={areaSeries}
+                xAxisKey="date"
+                height={320}
+                config={areaConfig}
+              />
+            </div>
+            {/* Mobile chart */}
+            <MobileAreaChart
+              data={growthData}
+              series={areaSeries}
+              xAxisKey="date"
+              config={areaConfig}
+            />
+          </>
         )}
       </div>
 
       {/* ── Stat Cards Row ─────────────────────────────────────────────── */}
       {stats && (
-        <div
-          key={dateRange + platformFilter + "stats"}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
-        >
-          <div className="sb-stagger-enter" style={{ animationDelay: "0ms" }}>
-            <DS2StatCard
-              label="Engagement Rate"
-              value={stats.engagementRate.value}
-              trend={{
-                value: stats.engagementRate.trend,
-                direction: stats.engagementRate.direction,
-              }}
-            />
-          </div>
-          <div className="sb-stagger-enter" style={{ animationDelay: "60ms" }}>
-            <DS2StatCard
-              label="Total Reach"
-              value={stats.totalReach.value}
-              trend={{
-                value: stats.totalReach.trend,
-                direction: stats.totalReach.direction,
-              }}
-            />
-          </div>
-          <div className="sb-stagger-enter" style={{ animationDelay: "120ms" }}>
-            <DS2StatCard
-              label="Posts Published"
-              value={stats.postsPublished.value}
-              trend={{
-                value: stats.postsPublished.trend,
-                direction: stats.postsPublished.direction,
-              }}
-            />
-          </div>
-          <div className="sb-stagger-enter" style={{ animationDelay: "180ms" }}>
-            <DS2StatCard
-              label="Total Followers"
-              value={stats.totalFollowers.value}
-              trend={{
-                value: stats.totalFollowers.trend,
-                direction: stats.totalFollowers.direction,
-              }}
-            />
-          </div>
+        <>
+          {/* Mobile: scrollable stat strip */}
+          <MobileStatStrip
+            stats={[
+              { label: "Engagement", value: stats.engagementRate.value, trend: { value: stats.engagementRate.trend, direction: stats.engagementRate.direction } },
+              { label: "Reach", value: stats.totalReach.value, trend: { value: stats.totalReach.trend, direction: stats.totalReach.direction } },
+              { label: "Published", value: stats.postsPublished.value, trend: { value: stats.postsPublished.trend, direction: stats.postsPublished.direction } },
+              { label: "Followers", value: stats.totalFollowers.value, trend: { value: stats.totalFollowers.trend, direction: stats.totalFollowers.direction } },
+              { label: "Best Post", value: stats.bestPost.value, trend: { value: stats.bestPost.trend, direction: stats.bestPost.direction } },
+            ]}
+          />
+          {/* Desktop: grid of stat cards */}
           <div
-            className="sb-stagger-enter sb-best-post-card"
-            style={{ animationDelay: "240ms" }}
+            key={dateRange + platformFilter + "stats"}
+            className="hidden lg:grid grid-cols-5 gap-6"
           >
-            <DS2StatCard
-              label="Best Post"
-              value={stats.bestPost.value}
-              description={`${stats.bestPost.preview}`}
-              trend={{
-                value: stats.bestPost.trend,
-                direction: stats.bestPost.direction,
-              }}
-            />
+            <div className="sb-stagger-enter" style={{ animationDelay: "0ms" }}>
+              <DS2StatCard label="Engagement Rate" value={stats.engagementRate.value} trend={{ value: stats.engagementRate.trend, direction: stats.engagementRate.direction }} />
+            </div>
+            <div className="sb-stagger-enter" style={{ animationDelay: "60ms" }}>
+              <DS2StatCard label="Total Reach" value={stats.totalReach.value} trend={{ value: stats.totalReach.trend, direction: stats.totalReach.direction }} />
+            </div>
+            <div className="sb-stagger-enter" style={{ animationDelay: "120ms" }}>
+              <DS2StatCard label="Posts Published" value={stats.postsPublished.value} trend={{ value: stats.postsPublished.trend, direction: stats.postsPublished.direction }} />
+            </div>
+            <div className="sb-stagger-enter" style={{ animationDelay: "180ms" }}>
+              <DS2StatCard label="Total Followers" value={stats.totalFollowers.value} trend={{ value: stats.totalFollowers.trend, direction: stats.totalFollowers.direction }} />
+            </div>
+            <div className="sb-stagger-enter sb-best-post-card" style={{ animationDelay: "240ms" }}>
+              <DS2StatCard label="Best Post" value={stats.bestPost.value} description={stats.bestPost.preview} trend={{ value: stats.bestPost.trend, direction: stats.bestPost.direction }} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ── Two-Column: Engagement + Top Content ───────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {/* Left: Engagement Breakdown */}
         <div>
-          <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
+          <p className="sb-label mb-1 lg:mb-2" style={{ color: "#e8956a" }}>
             Engagement
           </p>
-          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
+          <h3 className="text-lg lg:text-[22px] font-bold lg:font-medium mb-3 lg:mb-6" style={{ color: "#eaeef1", fontFamily: "'Neue Montreal', sans-serif" }}>
             Engagement Breakdown
           </h3>
           {engagementData.every((item) => item.count === 0) ? (
@@ -679,22 +670,21 @@ export default function AnalyticsPage() {
               </div>
             </DS2EmptyContainer>
           ) : (
-            <DS2BarChart
-              data={engagementData}
-              dataKey="count"
-              nameKey="type"
-              height={300}
-              config={engagementConfig}
-            />
+            <>
+              <div className="hidden lg:block">
+                <DS2BarChart data={engagementData} dataKey="count" nameKey="type" height={300} config={engagementConfig} />
+              </div>
+              <MobileBarChart data={engagementData} dataKey="count" nameKey="type" config={engagementConfig} />
+            </>
           )}
         </div>
 
         {/* Right: Top Content */}
         <div>
-          <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
+          <p className="sb-label mb-1 lg:mb-2" style={{ color: "#e8956a" }}>
             Content
           </p>
-          <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
+          <h3 className="text-lg lg:text-[22px] font-bold lg:font-medium mb-3 lg:mb-6" style={{ color: "#eaeef1", fontFamily: "'Neue Montreal', sans-serif" }}>
             Top Performing Content
           </h3>
           {topContent.length === 0 ? (
@@ -709,7 +699,26 @@ export default function AnalyticsPage() {
               </div>
             </DS2EmptyContainer>
           ) : (
-            <DS2DataTable columns={topContentColumns} data={topContent} />
+            <>
+              {/* Desktop: table */}
+              <div className="hidden lg:block">
+                <DS2DataTable columns={topContentColumns} data={topContent} />
+              </div>
+              {/* Mobile: card list */}
+              <MobileDataCards
+                cards={topContent.map((tc) => ({
+                  title: tc.preview || "No caption",
+                  subtitle: PLATFORM_ICONS[tc.platform]?.label ?? tc.platform,
+                  accentColor: PLATFORM_COLORS[tc.platform],
+                  fields: [
+                    { label: "Engagements", value: tc.engagements.toLocaleString(), isData: true },
+                    { label: "Reach", value: tc.reach.toLocaleString(), isData: true },
+                    { label: "Rate", value: `${tc.engagementRate}%`, isData: true, accent: true },
+                    { label: "Published", value: tc.publishedAt ? format(new Date(tc.publishedAt), "MMM d") : "—" },
+                  ],
+                }))}
+              />
+            </>
           )}
         </div>
       </div>
@@ -719,3 +728,6 @@ export default function AnalyticsPage() {
     </div>
   )
 }
+
+// Re-export format for mobile cards usage
+

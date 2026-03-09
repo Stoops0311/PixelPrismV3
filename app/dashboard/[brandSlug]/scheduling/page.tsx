@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useMemo, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
-import { useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import {
@@ -382,7 +383,7 @@ function PostComposerSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="!w-[460px] !max-w-[460px] overflow-y-auto">
+      <SheetContent side="right" className="!w-full sm:!w-[460px] !max-w-full sm:!max-w-[460px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="sb-h3">{selectedPost ? "Edit Post" : "New Post"}</SheetTitle>
           <SheetDescription>
@@ -897,17 +898,18 @@ export default function SchedulingPage() {
   }
 
   return (
-    <div className="space-y-32">
-      <div className="flex items-start justify-between">
-        <div>
+    <div className="px-4 lg:px-0 space-y-8 lg:space-y-32 py-4 lg:py-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
           <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Content Calendar</p>
-          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Scheduling</h1>
-          <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-            Plan and schedule content across your platforms.
+          <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>Scheduling</h1>
+          <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f" }}>
+            <span className="hidden lg:inline">Plan and schedule content across your platforms.</span>
+            <span className="lg:hidden">Schedule your content.</span>
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:gap-4">
+          <div className="hidden sm:flex items-center gap-2">
             {(connectedPlatformKeys.length ? connectedPlatformKeys : ALL_PLATFORM_KEYS).map((platform) => {
               const iconDef = PLATFORM_ICONS[platform]
               return (
@@ -935,12 +937,13 @@ export default function SchedulingPage() {
           </div>
           <Button className="sb-btn-primary" onClick={openNewPost}>
             <HugeiconsIcon icon={Add01Icon} size={16} className="mr-2" />
-            New Post
+            <span className="hidden sm:inline">New Post</span>
+            <span className="sm:hidden">New</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between pb-5" style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 lg:pb-5" style={{ borderBottom: "1px solid rgba(244,185,100,0.08)" }}>
         <ToggleGroup
           type="single"
           value={viewMode}
@@ -950,49 +953,37 @@ export default function SchedulingPage() {
           <ToggleGroupItem value="month" style={{ padding: "8px 16px" }}>Month</ToggleGroupItem>
         </ToggleGroup>
 
-        <div className="flex items-center gap-3">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
-                className="sb-btn-ghost !p-2 !min-h-[36px]"
-                onClick={navigateBack}
-              >
-                <HugeiconsIcon icon={ArrowLeft01Icon} size={18} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{viewMode === "week" ? "Previous week" : "Previous month"}</p>
-            </TooltipContent>
-          </Tooltip>
+        <div className="flex items-center gap-2 lg:gap-3">
+          <Button
+            aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+            className="sb-btn-ghost !p-2 !min-h-[36px]"
+            onClick={navigateBack}
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={18} />
+          </Button>
 
-          <span className="sb-data" style={{ color: "#eaeef1", minWidth: 220, textAlign: "center" }}>
+          <span className="sb-data text-xs lg:text-sm" style={{ color: "#eaeef1", minWidth: 140, textAlign: "center" }}>
             {dateLabel}
           </span>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                aria-label={viewMode === "week" ? "Next week" : "Next month"}
-                className="sb-btn-ghost !p-2 !min-h-[36px]"
-                onClick={navigateForward}
-              >
-                <HugeiconsIcon icon={ArrowRight01Icon} size={18} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{viewMode === "week" ? "Next week" : "Next month"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+          <Button
+            aria-label={viewMode === "week" ? "Next week" : "Next month"}
+            className="sb-btn-ghost !p-2 !min-h-[36px]"
+            onClick={navigateForward}
+          >
+            <HugeiconsIcon icon={ArrowRight01Icon} size={18} />
+          </Button>
 
-        <Button className="sb-btn-secondary !py-2 !px-4 !min-h-[36px] !text-xs" onClick={goToday}>
-          Today
-        </Button>
+          <Button className="sb-btn-secondary !py-2 !px-3 !min-h-[36px] !text-xs" onClick={goToday}>
+            Today
+          </Button>
+        </div>
       </div>
 
+      {/* Desktop calendar */}
       <div
         key={`${viewMode}-${navKey}`}
+        className="hidden lg:block"
         style={{
           animation: `${navDirection === "forward" ? "sb-step-in" : "sb-step-back"} 250ms cubic-bezier(0.34, 1.56, 0.64, 1) both`,
         }}
@@ -1007,6 +998,75 @@ export default function SchedulingPage() {
         ) : (
           <MonthlyCalendar month={currentMonth} posts={calendarPosts} onDayClick={handleMonthDayClick} />
         )}
+      </div>
+
+      {/* Mobile calendar — list view */}
+      <div className="lg:hidden space-y-3">
+        {(() => {
+          const days = viewMode === "week"
+            ? eachDayOfInterval({
+                start: currentWeekStart,
+                end: endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
+              })
+            : eachDayOfInterval({
+                start: startOfMonth(currentMonth),
+                end: endOfMonth(currentMonth),
+              })
+
+          const daysWithPosts = days.filter((day) =>
+            calendarPosts.some((p) => isSameDay(new Date(p.scheduledAt), day))
+          )
+
+          if (daysWithPosts.length === 0) {
+            return (
+              <div
+                className="flex flex-col items-center justify-center py-12"
+                style={{ border: "1px dashed rgba(244,185,100,0.12)" }}
+              >
+                <p className="sb-body-sm" style={{ color: "#6d8d9f" }}>
+                  No posts scheduled for this period.
+                </p>
+                <Button className="sb-btn-primary mt-4" onClick={openNewPost}>
+                  <HugeiconsIcon icon={Add01Icon} size={14} className="mr-1" />
+                  Create Post
+                </Button>
+              </div>
+            )
+          }
+
+          return daysWithPosts.map((day) => {
+            const dayPosts = calendarPosts
+              .filter((p) => isSameDay(new Date(p.scheduledAt), day))
+              .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+            const isCurrentDay = isSameDay(day, TODAY)
+
+            return (
+              <div key={day.toISOString()}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="sb-label"
+                    style={{ color: isCurrentDay ? "#f4b964" : "#6d8d9f", fontSize: 11 }}
+                  >
+                    {format(day, "EEE, MMM d")}
+                  </span>
+                  <div className="flex-1" style={{ height: 1, background: "rgba(244,185,100,0.06)" }} />
+                  <button
+                    className="sb-btn-ghost-inline sb-caption"
+                    style={{ color: "#6d8d9f", fontSize: 10 }}
+                    onClick={() => openComposerForDate(day)}
+                  >
+                    + Add
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {dayPosts.map((post, i) => (
+                    <PostCard key={post.id} post={post} index={i} onClick={() => openComposerForPost(post)} />
+                  ))}
+                </div>
+              </div>
+            )
+          })
+        })()}
       </div>
 
       <PostComposerSheet

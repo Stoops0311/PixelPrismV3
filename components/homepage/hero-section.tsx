@@ -2,7 +2,7 @@
 
 import { useRef } from "react"
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { SignedIn, SignedOut } from "@/lib/clerk-mock"
 import gsap from "gsap"
 import { useGSAP } from "@gsap/react"
 import { Button } from "@/components/ui/button"

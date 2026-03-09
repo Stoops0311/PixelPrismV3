@@ -1,7 +1,8 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { HugeiconsIcon } from "@hugeicons/react"

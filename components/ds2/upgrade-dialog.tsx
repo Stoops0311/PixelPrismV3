@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useAction } from "convex/react"
+import { useAction } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import {
   Dialog,

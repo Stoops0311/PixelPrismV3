@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import { useAction, useMutation, useQuery } from "convex/react"
+import { useAction, useMutation, useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { Button } from "@/components/ui/button"
@@ -169,10 +170,10 @@ export default function SocialAccountsSettingsPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="px-4 lg:px-0 space-y-8 lg:space-y-10 py-4 lg:py-0">
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Publishing Setup</p>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Social Accounts</h1>
+        <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>Social Accounts</h1>
         <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
           Connect channels to publish and sync analytics. {connectedCount}/{maxAccounts} connected.
         </p>

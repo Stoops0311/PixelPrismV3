@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { format } from "date-fns"
@@ -375,21 +376,38 @@ export default function StudioPage() {
   return (
     <div
       data-studio-layout
-      className="flex"
-      style={{ height: "calc(100vh - 64px)" }}
+      className="flex flex-col lg:flex-row"
+      style={{ minHeight: "calc(100vh - 64px)" }}
     >
       {/* ── Left: Generation Panel ────────────────────────────────────── */}
       <div
-        className="shrink-0 overflow-y-auto"
+        className="shrink-0 overflow-y-auto w-full lg:w-auto"
         style={{
-          width: 380,
-          minWidth: 340,
-          maxWidth: 440,
-          borderRight: "1px solid rgba(244,185,100,0.08)",
-          height: "100%",
-          padding: "32px 24px",
+          width: undefined,
+          minWidth: undefined,
+          maxWidth: undefined,
+          borderRight: undefined,
+          borderBottom: "1px solid rgba(244,185,100,0.08)",
+          padding: "16px",
         }}
       >
+        {/* Desktop-only side panel sizing */}
+        <style>{`
+          @media (min-width: 1024px) {
+            [data-studio-layout] > div:first-child {
+              width: 380px !important;
+              min-width: 340px !important;
+              max-width: 440px !important;
+              border-right: 1px solid rgba(244,185,100,0.08) !important;
+              border-bottom: none !important;
+              height: calc(100vh - 64px) !important;
+              padding: 32px 24px !important;
+            }
+            [data-studio-layout] {
+              height: calc(100vh - 64px) !important;
+            }
+          }
+        `}</style>
         <ImageGenerationPanel
           products={products}
           preSelectedProduct={preSelectedProduct}
@@ -409,8 +427,15 @@ export default function StudioPage() {
       {/* ── Right: Gallery ──────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto"
-        style={{ padding: "32px 32px" }}
+        style={{ padding: "16px" }}
       >
+        <style>{`
+          @media (min-width: 1024px) {
+            [data-studio-layout] > div:nth-child(2) {
+              padding: 32px !important;
+            }
+          }
+        `}</style>
         {/* Filter bar */}
         <div
           className="flex flex-wrap items-center gap-3 mb-8 pb-5"
@@ -461,11 +486,12 @@ export default function StudioPage() {
             </SelectContent>
           </Select>
 
-          {/* View toggle */}
+          {/* View toggle — hidden on mobile (always grid) */}
           <ToggleGroup
             type="single"
             value={viewMode}
             onValueChange={(val) => val && setViewMode(val as "grid" | "list")}
+            className="hidden lg:flex"
           >
             <ToggleGroupItem value="grid" style={{ padding: "8px 10px" }}>
               <HugeiconsIcon icon={GridViewIcon} size={16} />

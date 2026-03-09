@@ -1,4 +1,4 @@
-import { SignUp } from "@clerk/nextjs"
+import { SignUp } from "@/lib/clerk-mock"
 
 export default function SignUpPage() {
   return (
