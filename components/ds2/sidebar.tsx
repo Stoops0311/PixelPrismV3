@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useClerk } from "@clerk/nextjs"
+import { useClerk } from "@/lib/clerk-mock"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   DashboardSquare01Icon,

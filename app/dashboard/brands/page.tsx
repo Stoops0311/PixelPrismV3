@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useState } from "react"
 import Link from "next/link"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -234,7 +235,7 @@ export default function BrandsListPage() {
   }
 
   return (
-    <div className="space-y-32">
+    <div className="px-4 lg:px-0 space-y-8 lg:space-y-32 py-4 lg:py-0">
       {/* Header Row */}
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1">

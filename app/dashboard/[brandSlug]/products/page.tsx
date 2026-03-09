@@ -1,9 +1,10 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useState } from "react"
 import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Image02Icon, Add01Icon, PackageIcon } from "@hugeicons/core-free-icons"
@@ -123,13 +124,14 @@ export default function ProductsPage() {
   const showEmpty = forceEmpty || productList.length === 0
 
   return (
-    <div className="space-y-32">
+    <div className="px-4 lg:px-0 space-y-8 lg:space-y-32 py-4 lg:py-0">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Products</h1>
-          <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-            Manage your brand&apos;s products and generate marketing images.
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>Products</h1>
+          <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f" }}>
+            <span className="hidden lg:inline">Manage your brand&apos;s products and generate marketing images.</span>
+            <span className="lg:hidden">Manage your products.</span>
           </p>
           <p className="mt-2">
             <span className="sb-data" style={{ color: "#d4dce2" }}>
@@ -158,7 +160,7 @@ export default function ProductsPage() {
       {/* Product Grid Section */}
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Catalog</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Your Products</h3>
+        <h3 className="sb-h3 mb-4 lg:mb-6 text-lg lg:text-[22px]" style={{ color: "#eaeef1" }}>Your Products</h3>
 
         {showEmpty ? (
           <DS2EmptyStateCard

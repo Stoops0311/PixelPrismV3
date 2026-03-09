@@ -10,6 +10,7 @@ import { SocialProofSection } from "@/components/homepage/social-proof-section"
 import { PricingSection } from "@/components/homepage/pricing-section"
 import { FinalCTA } from "@/components/homepage/final-cta"
 import { MarketingFooter } from "@/components/homepage/marketing-footer"
+import { MobileBottomNav } from "@/components/homepage/mobile-bottom-nav"
 
 export default function HomePage() {
   return (
@@ -23,6 +24,7 @@ export default function HomePage() {
       <PricingSection />
       <FinalCTA />
       <MarketingFooter />
+      <MobileBottomNav />
     </div>
   )
 }

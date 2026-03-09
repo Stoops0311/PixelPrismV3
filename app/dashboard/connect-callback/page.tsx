@@ -1,8 +1,9 @@
 "use client"
 
+import { Suspense } from "react"
 import { useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAction } from "convex/react"
+import { useAction } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { DS2Spinner } from "@/components/ds2/spinner"
@@ -34,7 +35,7 @@ function decodeState(value: string | null): CallbackState | null {
   }
 }
 
-export default function ConnectCallbackPage() {
+function ConnectCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const syncAccountsForBrand = useAction(api.postformeActions.syncAccountsForBrand)
@@ -113,5 +114,13 @@ export default function ConnectCallbackPage() {
     <div className="min-h-[50vh] flex items-center justify-center">
       <DS2Spinner />
     </div>
+  )
+}
+
+export default function ConnectCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><DS2Spinner /></div>}>
+      <ConnectCallbackInner />
+    </Suspense>
   )
 }

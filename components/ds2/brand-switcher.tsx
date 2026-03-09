@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { UnfoldMoreIcon, PlusSignIcon } from "@hugeicons/core-free-icons"

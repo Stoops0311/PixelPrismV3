@@ -1,9 +1,10 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Image02Icon, ArrowLeft01Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons"
@@ -126,11 +127,11 @@ export default function ProductDetailPage() {
   const imageList = generatedImages ?? []
 
   return (
-    <div>
+    <div className="px-4 lg:px-0 py-4 lg:py-0">
       {/* Back navigation */}
       <Link
         href={`/dashboard/${brandSlug}/products`}
-        className="sb-btn-ghost-inline inline-flex items-center gap-1.5 mb-8"
+        className="sb-btn-ghost-inline inline-flex items-center gap-1.5 mb-4 lg:mb-8"
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
         <span>Back to Products</span>
@@ -181,7 +182,7 @@ export default function ProductDetailPage() {
 
           {/* Metadata row */}
           <div
-            className="flex items-center gap-8 mt-8 pt-6"
+            className="flex items-center gap-4 lg:gap-8 mt-6 lg:mt-8 pt-4 lg:pt-6 flex-wrap"
             style={{ borderTop: "1px solid rgba(244,185,100,0.08)" }}
           >
             <div>
@@ -220,7 +221,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Product Image Gallery — Masonry */}
-      <div className="mt-20">
+      <div className="mt-10 lg:mt-20">
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Gallery</p>
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>
           Generated Images

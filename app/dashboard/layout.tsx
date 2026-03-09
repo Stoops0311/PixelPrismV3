@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
@@ -10,6 +11,7 @@ import { DS2ThemeProvider } from "@/components/ds2/theme-provider"
 import { AppSidebar } from "@/components/ds2/sidebar"
 import { DashboardHeader } from "@/components/ds2/dashboard-header"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { BottomNavBar } from "@/components/ds2/bottom-nav"
 import type { Brand, DashboardUser, BrandNavCounts } from "@/types/dashboard"
 
 const SIDEBAR_STORAGE_KEY = "pixelprism-sidebar-open"
@@ -264,13 +266,17 @@ export default function DashboardLayout({
               breadcrumbs={breadcrumbs}
               credits={credits}
               plan={plan}
-
-
             />
-            <main data-slot="dashboard-main" className="w-full flex-1 flex flex-col">
+            <main data-slot="dashboard-main" className="w-full flex-1 flex flex-col pb-[84px] lg:pb-0">
               {children}
             </main>
           </SidebarInset>
+          <BottomNavBar
+            currentBrand={currentBrand}
+            brands={brands}
+            onBrandChange={handleBrandChange}
+            brandNavCounts={brandNavCounts}
+          />
         </SidebarProvider>
       </TooltipProvider>
     </DS2ThemeProvider>

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { SignedIn, SignedOut } from "@/lib/clerk-mock"
 import { Button } from "@/components/ui/button"
 
 export function FinalCTA() {

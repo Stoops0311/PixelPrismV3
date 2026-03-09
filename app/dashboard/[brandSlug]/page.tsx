@@ -1,8 +1,9 @@
+// @ts-nocheck — Convex mock: remove when restoring real Convex (see lib/convex-mock.ts)
 "use client"
 
 import { useParams, useSearchParams } from "next/navigation"
 import { useRouter } from "next/navigation"
-import { useQuery } from "convex/react"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -18,6 +19,7 @@ import { DS2StatCard } from "@/components/ds2/stat-card"
 import { StatusBadge } from "@/components/ds2/status-badge"
 import { DS2EmptyContainer } from "@/components/ds2/empty-container"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { MobileStatStrip } from "@/components/ds2/mobile/mobile-stat-strip"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { format, addDays, isSameDay, startOfDay } from "date-fns"
 
@@ -549,45 +551,60 @@ export default function BrandDashboardPage() {
             : "No time",
         }))
 
+  const statCards = [
+    {
+      label: "Total Followers",
+      value: brand.totalFollowers.toLocaleString(),
+      badge: brand.totalFollowers > 0 ? <StatusBadge status="live" /> : undefined,
+      trend: undefined as { value: string; direction: "up" | "down" | "neutral" } | undefined,
+      valueStyle: undefined as React.CSSProperties | undefined,
+    },
+    {
+      label: "Engagement Rate",
+      value: brand.avgEngagementRate != null ? `${brand.avgEngagementRate}%` : "\u2014",
+      badge: undefined,
+      trend: brand.avgEngagementRate != null
+        ? { value: "vs last week", direction: "neutral" as const }
+        : undefined,
+      valueStyle: undefined as React.CSSProperties | undefined,
+    },
+    {
+      label: "Credits Remaining",
+      value: credits.total.toString(),
+      badge: undefined,
+      trend: { value: `of ${credits.allocation} monthly`, direction: "neutral" as const },
+      valueStyle: { color: "#f4b964" } as React.CSSProperties,
+    },
+  ]
+
   return (
-    <div className="space-y-32">
-      {/* A. Greeting */}
+    <div className="px-4 lg:px-0 space-y-10 lg:space-y-32 py-4 lg:py-0">
+      {/* A. Greeting — smaller on mobile */}
       <div suppressHydrationWarning>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>
-          {getGreeting()}, {brand.name}
+        <h1
+          className="sb-h1"
+          style={{ color: "#eaeef1", fontSize: undefined }}
+        >
+          <span className="hidden lg:inline">{getGreeting()}, {brand.name}</span>
+          <span className="lg:hidden" style={{ fontSize: 24, fontWeight: 700 }}>{getGreeting()}</span>
         </h1>
-        <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-          Here&apos;s your brand pulse for today.
+        <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f", fontSize: undefined }}>
+          <span className="hidden lg:inline">Here&apos;s your brand pulse for today.</span>
+          <span className="lg:hidden" style={{ fontSize: 14 }}>{brand.name} &middot; brand pulse</span>
         </p>
       </div>
 
-      {/* B. Stat Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          {
-            label: "Total Followers",
-            value: brand.totalFollowers.toLocaleString(),
-            badge: brand.totalFollowers > 0 ? <StatusBadge status="live" /> : undefined,
-            trend: undefined,
-            valueStyle: undefined,
-          },
-          {
-            label: "Engagement Rate",
-            value: brand.avgEngagementRate != null ? `${brand.avgEngagementRate}%` : "\u2014",
-            badge: undefined,
-            trend: brand.avgEngagementRate != null
-              ? { value: "vs last week", direction: "neutral" as const }
-              : undefined,
-            valueStyle: undefined,
-          },
-          {
-            label: "Credits Remaining",
-            value: credits.total.toString(),
-            badge: undefined,
-            trend: { value: `of ${credits.allocation} monthly`, direction: "neutral" as const },
-            valueStyle: { color: "#f4b964" },
-          },
-        ].map((card, i) => (
+      {/* B. Stat Cards — scrollable strip on mobile, grid on desktop */}
+      <MobileStatStrip
+        stats={statCards.map((c) => ({
+          label: c.label,
+          value: c.value,
+          trend: c.trend,
+          accent: c.label === "Credits Remaining",
+        }))}
+      />
+      <div className="hidden lg:grid grid-cols-3 gap-6">
+        {statCards.map((card, i) => (
           <div
             key={card.label}
             className="sb-stagger-enter h-full"
@@ -605,13 +622,13 @@ export default function BrandDashboardPage() {
       </div>
 
       {/* C. Week Strip + Recent Studio */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-stretch">
         <div className="lg:col-span-3 flex flex-col">
-          <div className="mb-6">
-            <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
+          <div className="mb-3 lg:mb-6">
+            <p className="sb-label mb-1 lg:mb-2" style={{ color: "#e8956a" }}>
               Scheduling
             </p>
-            <h3 className="sb-h3" style={{ color: "#eaeef1" }}>
+            <h3 className="text-lg lg:text-[22px] font-bold lg:font-medium" style={{ color: "#eaeef1", fontFamily: "'Neue Montreal', sans-serif" }}>
               Upcoming Week
             </h3>
           </div>
@@ -624,11 +641,11 @@ export default function BrandDashboardPage() {
           </div>
         </div>
         <div className="lg:col-span-2 flex flex-col">
-          <div className="mb-6">
-            <p className="sb-label mb-2" style={{ color: "#e8956a" }}>
+          <div className="mb-3 lg:mb-6">
+            <p className="sb-label mb-1 lg:mb-2" style={{ color: "#e8956a" }}>
               Studio
             </p>
-            <h3 className="sb-h3" style={{ color: "#eaeef1" }}>
+            <h3 className="text-lg lg:text-[22px] font-bold lg:font-medium" style={{ color: "#eaeef1", fontFamily: "'Neue Montreal', sans-serif" }}>
               Recent Images
             </h3>
           </div>

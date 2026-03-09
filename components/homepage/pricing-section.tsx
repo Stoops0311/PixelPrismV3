@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
-import { useQuery } from "convex/react"
+import { SignedIn, SignedOut } from "@/lib/clerk-mock"
+import { useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { CheckoutLink } from "@convex-dev/polar/react"
 import { Button } from "@/components/ui/button"

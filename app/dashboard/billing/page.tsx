@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useAction, useQuery } from "convex/react"
+import { useAction, useQuery } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
@@ -21,6 +21,7 @@ import { DS2BarChart } from "@/components/ds2/chart-bar"
 import { DS2DataTable } from "@/components/ds2/data-table"
 import type { DS2Column } from "@/components/ds2/data-table"
 import { DS2Spinner } from "@/components/ds2/spinner"
+import { MobileBarChart, MobileDataCards } from "@/components/ds2/mobile"
 import type { ChartConfig } from "@/components/ui/chart"
 import { showError, showInfo } from "@/components/ds2/toast"
 import { CREDIT_PACKS, PLAN_PRICE_BY_TIER } from "@/lib/polar"
@@ -285,14 +286,42 @@ function UsageTabs({
       </TabsList>
 
       <TabsContent value="credits" className="space-y-6 pt-6">
-        <DS2BarChart
+        {/* Mobile chart */}
+        <MobileBarChart
           data={chartData}
           dataKey="credits"
           nameKey="date"
-          height={240}
           config={chartConfig}
         />
-        <DS2DataTable columns={transactionColumns} data={transactions} />
+        {/* Desktop chart */}
+        <div className="hidden lg:block">
+          <DS2BarChart
+            data={chartData}
+            dataKey="credits"
+            nameKey="date"
+            height={240}
+            config={chartConfig}
+          />
+        </div>
+        {/* Mobile transactions */}
+        <div className="lg:hidden">
+          <MobileDataCards
+            cards={transactions.map((t) => ({
+              title: <span className="sb-body-sm" style={{ color: "#d4dce2" }}>{t.description}</span>,
+              subtitle: <span className="sb-caption" style={{ color: "#6d8d9f" }}>{format(new Date(t.createdAt), "MMM d, yyyy")}</span>,
+              fields: [
+                {
+                  label: "Credits",
+                  value: <span className="sb-data" style={{ color: t.amount < 0 ? "#e8956a" : "#a4f464" }}>{t.amount > 0 ? "+" : ""}{t.amount}</span>,
+                },
+              ],
+            }))}
+          />
+        </div>
+        {/* Desktop table */}
+        <div className="hidden lg:block">
+          <DS2DataTable columns={transactionColumns} data={transactions} />
+        </div>
       </TabsContent>
 
       <TabsContent value="brands" className="pt-6">
@@ -422,11 +451,12 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-32">
+    <div className="px-4 lg:px-0 space-y-8 lg:space-y-32 py-4 lg:py-0">
       <div>
-        <h1 className="sb-h1" style={{ color: "#eaeef1" }}>Billing & Credits</h1>
-        <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-          Manage your subscription, buy credit packs, and monitor account usage.
+        <h1 className="sb-h1 text-[24px] lg:text-[44px]" style={{ color: "#eaeef1" }}>Billing & Credits</h1>
+        <p className="sb-body mt-2 lg:mt-3" style={{ color: "#6d8d9f" }}>
+          <span className="hidden lg:inline">Manage your subscription, buy credit packs, and monitor account usage.</span>
+          <span className="lg:hidden">Manage billing and credits.</span>
         </p>
       </div>
 
@@ -456,7 +486,7 @@ export default function BillingPage() {
 
       <div>
         <p className="sb-label mb-2" style={{ color: "#e8956a" }}>Usage</p>
-        <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Usage Breakdown</h3>
+        <h3 className="sb-h3 mb-4 lg:mb-6 text-lg lg:text-[22px]" style={{ color: "#eaeef1" }}>Usage Breakdown</h3>
         <UsageTabs
           transactions={transactions}
           dailyUsage={dailyUsage}

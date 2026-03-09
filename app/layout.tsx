@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google"
-import { ClerkProvider } from "@clerk/nextjs"
-import { dark } from "@clerk/themes"
+// Clerk mocked out for local testing — see lib/clerk-mock.tsx
+// Original: import { ClerkProvider } from "@clerk/nextjs"
+// Original: import { dark } from "@clerk/themes"
 import { ConvexClientProvider } from "@/lib/convex-provider"
 import "./globals.css"
 
@@ -28,29 +29,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider
-      appearance={{
-        baseTheme: dark,
-        variables: {
-          colorPrimary: "#f4b964",
-          colorBackground: "#071a26",
-          colorInputBackground: "#0a2535",
-          colorText: "#eaeef1",
-          colorTextSecondary: "#6d8d9f",
-          borderRadius: "0px",
-          fontFamily: '"General Sans", sans-serif',
-        },
-      }}
-    >
-      <html lang="en" className={jetbrainsMono.variable}>
-        <body
-          className={`sb-root ${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          <ConvexClientProvider>
-            {children}
-          </ConvexClientProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className={jetbrainsMono.variable}>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      </head>
+      <body
+        className={`sb-root ${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <ConvexClientProvider>
+          {children}
+        </ConvexClientProvider>
+      </body>
+    </html>
   )
 }

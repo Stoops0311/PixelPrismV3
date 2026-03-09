@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, type ReactNode } from "react"
-import { useMutation } from "convex/react"
+import { useMutation } from "@/lib/convex-mock"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { HugeiconsIcon } from "@hugeicons/react"
