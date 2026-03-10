@@ -512,15 +512,15 @@ export default function BrandDashboardPage() {
     )
   }
 
-  if (!brand) {
+  if (!brand || !credits) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="text-center">
           <h2 className="sb-h2" style={{ color: "#eaeef1" }}>
-            Brand not found
+            {!brand ? "Brand not found" : "Unable to load credits"}
           </h2>
           <p className="sb-body mt-3" style={{ color: "#6d8d9f" }}>
-            No brand matches the slug &ldquo;{brandSlug}&rdquo;.
+            {!brand ? `No brand matches the slug "${brandSlug}".` : "Please try refreshing the page."}
           </p>
         </div>
       </div>
