@@ -115,9 +115,14 @@ export const currentWithSubscription = query({
       .unique()
     if (!user) return null
 
-    const subscription = await polar.getCurrentSubscription(ctx, {
-      userId: user._id,
-    })
+    let subscription = null
+    try {
+      subscription = await polar.getCurrentSubscription(ctx, {
+        userId: user._id,
+      })
+    } catch {
+      // Polar SDK may throw if user has no customer record yet
+    }
 
     return {
       ...user,
