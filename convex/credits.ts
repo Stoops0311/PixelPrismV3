@@ -3,28 +3,19 @@ import { internal } from "./_generated/api"
 import { v } from "convex/values"
 
 // ============================================================
-// AUTH HELPER
-// ============================================================
-
-async function getCurrentUser(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
-    .unique()
-  if (!user) throw new Error("User not found")
-  return user
-}
-
-// ============================================================
 // PUBLIC QUERIES
 // ============================================================
 
 export const getBalance = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .unique()
+    if (!user) return null
     return {
       monthly: user.monthlyCreditsRemaining,
       topUp: user.topUpCreditsRemaining,
@@ -41,7 +32,13 @@ export const getTransactions = query({
     cursor: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .unique()
+    if (!user) return null
     const limit = args.limit ?? 20
 
     const results = await ctx.db
@@ -61,7 +58,13 @@ export const getTransactions = query({
 export const checkSufficientCredits = query({
   args: { amount: v.number() },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .unique()
+    if (!user) return null
     const available = user.monthlyCreditsRemaining + user.topUpCreditsRemaining
     return {
       sufficient: available >= args.amount,
@@ -76,7 +79,13 @@ export const getDailyUsage = query({
     days: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+      .unique()
+    if (!user) return null
     const days = Math.min(Math.max(args.days ?? 30, 1), 90)
     const now = Date.now()
     const cutoff = now - days * 24 * 60 * 60 * 1000
