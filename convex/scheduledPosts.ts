@@ -4,12 +4,12 @@ import { v } from "convex/values"
 
 async function getCurrentUser(ctx: any) {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
+  if (!identity) return null
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .unique()
-  if (!user) throw new Error("User not found")
+  if (!user) return null
   return user
 }
 
@@ -35,6 +35,7 @@ export const listByBrand = query({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return []
     const brand = await ctx.db.get(args.brandId)
     if (!brand || brand.userId !== user._id) throw new Error("Brand not found")
 
@@ -62,6 +63,7 @@ export const listUpcoming = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return []
     const limit = args.limit ?? 20
     const now = Date.now()
     const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000
@@ -117,6 +119,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
     const brand = await ctx.db.get(args.brandId)
     if (!brand || brand.userId !== user._id) throw new Error("Brand not found")
 
@@ -206,6 +209,7 @@ export const saveDraft = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
     const brand = await ctx.db.get(args.brandId)
     if (!brand || brand.userId !== user._id) throw new Error("Brand not found")
 
@@ -294,6 +298,7 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
     const post = await ctx.db.get(args.scheduledPostId)
 
     if (!post || post.userId !== user._id) {

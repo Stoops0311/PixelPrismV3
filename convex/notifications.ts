@@ -7,12 +7,12 @@ import { v } from "convex/values"
 
 async function getCurrentUser(ctx: any) {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
+  if (!identity) return null
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .unique()
-  if (!user) throw new Error("User not found")
+  if (!user) return null
   return user
 }
 
@@ -59,6 +59,7 @@ export const listRecent = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return []
     const limit = Math.min(args.limit ?? 20, 50)
 
     return await ctx.db
@@ -73,6 +74,7 @@ export const unreadCount = query({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return 0
 
     const unread = await ctx.db
       .query("notifications")
@@ -93,6 +95,7 @@ export const markRead = mutation({
   args: { notificationId: v.id("notifications") },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
     const notif = await ctx.db.get(args.notificationId)
     if (!notif || notif.userId !== user._id) return
     if (notif.read) return
@@ -108,6 +111,7 @@ export const markAllRead = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_user_and_read", (q: any) =>

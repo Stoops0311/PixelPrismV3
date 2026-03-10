@@ -8,12 +8,12 @@ import { v } from "convex/values"
 
 async function getCurrentUser(ctx: any) {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
+  if (!identity) return null
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .unique()
-  if (!user) throw new Error("User not found")
+  if (!user) return null
   return user
 }
 
@@ -44,6 +44,7 @@ export const listByBrand = query({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return []
 
     const brand = await ctx.db.get(args.brandId)
     if (!brand || brand.userId !== user._id) {
@@ -83,6 +84,7 @@ export const listByProduct = query({
   args: { productId: v.id("products") },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return []
 
     const product = await ctx.db.get(args.productId)
     if (!product || product.userId !== user._id) {
@@ -102,6 +104,7 @@ export const getById = query({
   args: { imageId: v.id("generatedImages") },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) return null
 
     const image = await ctx.db.get(args.imageId)
     if (!image || image.userId !== user._id) {
@@ -145,6 +148,7 @@ export const createBatch = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
 
     // Verify brand ownership
     const brand = await ctx.db.get(args.brandId)
@@ -273,6 +277,7 @@ export const remove = mutation({
   args: { imageId: v.id("generatedImages") },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
+    if (!user) throw new Error("Not authenticated")
 
     const image = await ctx.db.get(args.imageId)
     if (!image || image.userId !== user._id) {

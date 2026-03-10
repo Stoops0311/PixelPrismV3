@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -142,6 +143,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { isLoaded: clerkLoaded } = useAuth()
 
   // Convex queries
   const convexUser = useQuery(api.users.current)
@@ -226,7 +228,7 @@ export default function DashboardLayout({
   )
 
   // Show loading state while data loads
-  if (convexUser === undefined || convexBrands === undefined) {
+  if (!clerkLoaded || convexUser === undefined || convexBrands === undefined) {
     return (
       <DS2ThemeProvider>
         <div className="flex items-center justify-center min-h-screen">
