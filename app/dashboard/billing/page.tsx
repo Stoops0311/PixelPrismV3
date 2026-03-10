@@ -362,11 +362,11 @@ export default function BillingPage() {
     )
   }
 
-  if (!user) {
+  if (!user || !balance) {
     return (
       <div className="flex items-center justify-center py-32">
         <p className="sb-body" style={{ color: "#6d8d9f" }}>
-          Please sign in to view billing.
+          {!user ? "Please sign in to view billing." : "Unable to load billing data. Please refresh."}
         </p>
       </div>
     )
@@ -459,10 +459,10 @@ export default function BillingPage() {
         <h3 className="sb-h3 mb-6" style={{ color: "#eaeef1" }}>Usage Breakdown</h3>
         <UsageTabs
           transactions={transactions}
-          dailyUsage={dailyUsage}
+          dailyUsage={dailyUsage ?? []}
           maxBrands={user.maxBrands}
           maxSocialAccounts={user.maxSocialAccounts}
-          socialUsed={connectedAccounts.length}
+          socialUsed={connectedAccounts?.length ?? 0}
         />
       </div>
 

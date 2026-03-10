@@ -393,7 +393,7 @@ export default function StudioPage() {
         <ImageGenerationPanel
           products={products}
           preSelectedProduct={preSelectedProduct}
-          availableCredits={balance.total}
+          availableCredits={balance?.total ?? 0}
           onGenerate={handleGenerate}
           isGenerating={isGenerating}
           generationProgress={generationProgress}
