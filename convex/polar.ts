@@ -180,9 +180,14 @@ export const generatePlanCheckoutLink = action({
     if (!user) throw new Error("Not authenticated")
 
     const productId = TIER_PRODUCT_IDS[args.tier]
-    const currentSubscription = await polar.getCurrentSubscription(ctx as any, {
-      userId: String(user._id),
-    })
+    let currentSubscription = null
+    try {
+      currentSubscription = await polar.getCurrentSubscription(ctx as any, {
+        userId: String(user._id),
+      })
+    } catch {
+      // Polar SDK may throw if product record not synced yet
+    }
 
     const checkout = await polar.createCheckoutSession(ctx as any, {
       productIds: [productId],

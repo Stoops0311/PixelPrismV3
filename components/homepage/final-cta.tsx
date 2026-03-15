@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button"
 
 export function FinalCTA() {
@@ -84,7 +84,7 @@ export function FinalCTA() {
             justifyContent: "center",
           }}
         >
-          <SignedOut>
+          <Show when="signed-out">
             <Link href="/sign-up">
               <Button
                 className="sb-btn-primary"
@@ -98,8 +98,8 @@ export function FinalCTA() {
                 View Pricing <span className="sb-arrow">→</span>
               </Button>
             </Link>
-          </SignedOut>
-          <SignedIn>
+          </Show>
+          <Show when="signed-in">
             <Link href="/dashboard">
               <Button
                 className="sb-btn-primary"
@@ -113,7 +113,7 @@ export function FinalCTA() {
                 View Pricing <span className="sb-arrow">→</span>
               </Button>
             </Link>
-          </SignedIn>
+          </Show>
         </div>
 
         {/* Footnote */}
@@ -125,5 +125,5 @@ export function FinalCTA() {
         </p>
       </div>
     </section>
-  )
+  );
 }

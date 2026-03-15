@@ -2,7 +2,7 @@
 
 import { useRef } from "react"
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs";
 import gsap from "gsap"
 import { useGSAP } from "@gsap/react"
 import { Button } from "@/components/ui/button"
@@ -71,7 +71,6 @@ export function HeroSection() {
           pointerEvents: "none",
         }}
       />
-
       {/* Content */}
       <div
         style={{
@@ -129,7 +128,7 @@ export function HeroSection() {
             marginBottom: 32,
           }}
         >
-          <SignedOut>
+          <Show when="signed-out">
             <Link href="/sign-up">
               <Button
                 className="sb-btn-primary"
@@ -146,8 +145,8 @@ export function HeroSection() {
                 </span>
               </Button>
             </Link>
-          </SignedOut>
-          <SignedIn>
+          </Show>
+          <Show when="signed-in">
             <Link href="/dashboard">
               <Button
                 className="sb-btn-primary"
@@ -156,7 +155,7 @@ export function HeroSection() {
                 Go to Dashboard
               </Button>
             </Link>
-          </SignedIn>
+          </Show>
         </div>
 
         {/* Social proof */}
@@ -167,7 +166,6 @@ export function HeroSection() {
           No credit card required · Used by 2,000+ businesses
         </p>
       </div>
-
       {/* Bouncy scroll indicator */}
       <div
         aria-hidden
@@ -196,7 +194,6 @@ export function HeroSection() {
           <path d="M4 15 L10 22 L16 15" stroke="#f4b964" strokeWidth="1.5" strokeLinecap="square" />
         </svg>
       </div>
-
       {/* Bottom divider */}
       <div
         aria-hidden
@@ -210,5 +207,5 @@ export function HeroSection() {
         }}
       />
     </section>
-  )
+  );
 }

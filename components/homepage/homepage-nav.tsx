@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
+import { Show, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button"
 
 type NavLink = {
@@ -131,7 +131,7 @@ export function HomepageNav() {
           </div>
 
           {/* Auth buttons */}
-          <SignedOut>
+          <Show when="signed-out">
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <Link href="/sign-in">
                 <Button className="sb-btn-ghost">Sign In</Button>
@@ -142,12 +142,12 @@ export function HomepageNav() {
                 </Button>
               </Link>
             </div>
-          </SignedOut>
-          <SignedIn>
+          </Show>
+          <Show when="signed-in">
             <UserButton />
-          </SignedIn>
+          </Show>
         </div>
       </div>
     </nav>
-  )
+  );
 }

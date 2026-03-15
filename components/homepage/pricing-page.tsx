@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs";
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { CheckoutLink } from "@convex-dev/polar/react"
@@ -17,6 +17,7 @@ import {
   FULL_TIERS,
   TIER_COMPARISON_FEATURES,
   CREDIT_PACKS,
+  ORGANIZATION_TIER,
 } from "@/lib/polar"
 import { MarketingLayout } from "@/components/homepage/marketing-layout"
 
@@ -118,19 +119,19 @@ function PlanCTA({ tierKey, popular }: { tierKey: string; popular: boolean }) {
 
   if (tierKey === "free") {
     return (
-      <SignedOut>
+      <Show when="signed-out">
         <Link href="/sign-up" className="w-full">
           <Button className={btnClass}>Get Started Free</Button>
         </Link>
-      </SignedOut>
-    )
+      </Show>
+    );
   }
 
   const product = products?.[tierKey as keyof typeof products]
 
   return (
     <>
-      <SignedIn>
+      <Show when="signed-in">
         {product ? (
           <CheckoutLink polarApi={api.polar} productIds={[product.id]} embed={false}>
             <Button className={btnClass}>Subscribe</Button>
@@ -138,14 +139,14 @@ function PlanCTA({ tierKey, popular }: { tierKey: string; popular: boolean }) {
         ) : (
           <Button className={btnClass} disabled>Loading...</Button>
         )}
-      </SignedIn>
-      <SignedOut>
+      </Show>
+      <Show when="signed-out">
         <Link href="/sign-up" className="w-full">
           <Button className={btnClass}>Get Started</Button>
         </Link>
-      </SignedOut>
+      </Show>
     </>
-  )
+  );
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -183,14 +184,13 @@ export function PricingPageContent() {
             </p>
           </div>
 
-          <SignedIn>
+          <Show when="signed-in">
             <div style={{ marginTop: 40 }}>
               <SubscriptionStatus />
             </div>
-          </SignedIn>
+          </Show>
         </div>
       </section>
-
       {/* ── Plan Cards ───────────────────────────────────────────────────── */}
       <section style={{ padding: "0 0 120px", background: "#071a26" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px" }}>
@@ -318,6 +318,115 @@ export function PricingPageContent() {
           </div>
         </div>
       </section>
+      {/* ── Organization Banner ──────────────────────────────────────────── */}
+      <section style={{ padding: "0 0 80px", background: "#071a26" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px" }}>
+          <div
+            style={{
+              border: "1px solid rgba(244,185,100,0.22)",
+              background: "linear-gradient(135deg, rgba(244,185,100,0.04) 0%, rgba(14,40,56,1) 100%)",
+              padding: "40px 48px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 48,
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Decorative gold line at top */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 2,
+                background: "linear-gradient(90deg, transparent, #f4b964, transparent)",
+              }}
+            />
+
+            <div style={{ flex: 1 }}>
+              <p className="sb-label" style={{ color: "#e8956a", marginBottom: 8, letterSpacing: "0.12em" }}>
+                {ORGANIZATION_TIER.name.toUpperCase()}
+              </p>
+              <h3 className="sb-h3" style={{ color: "#eaeef1", marginBottom: 8 }}>
+                Need more than a plan?
+              </h3>
+              <p className="sb-body-sm" style={{ color: "#6d8d9f", marginBottom: 20, maxWidth: 480 }}>
+                For teams and organizations that need custom limits, dedicated support, and tailored integrations.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px 24px",
+                }}
+              >
+                {ORGANIZATION_TIER.features.map((f) => (
+                  <span
+                    key={f}
+                    className="sb-body-sm"
+                    style={{ color: "#d4dce2", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span style={{ color: "#f4b964", fontWeight: 700 }}>✓</span>
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ flexShrink: 0, textAlign: "center" }}>
+              <p className="sb-data" style={{ color: "#f4b964", fontSize: 32, marginBottom: 4 }}>Custom</p>
+              <p className="sb-caption" style={{ color: "#6d8d9f", marginBottom: 20 }}>pricing</p>
+              <Link href="/contact">
+                <Button className="sb-btn-primary" style={{ padding: "14px 40px", fontSize: 15 }}>
+                  Contact Us
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Hire a Professional Marketer ──────────────────────────────────── */}
+      <section
+        style={{
+          padding: "80px 0",
+          background: "linear-gradient(180deg, #071a26 0%, #0a2030 50%, #071a26 100%)",
+        }}
+      >
+        <div style={{ maxWidth: 780, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
+          <div
+            style={{
+              width: 60,
+              height: 2,
+              background: "linear-gradient(90deg, transparent, #e8956a, transparent)",
+              margin: "0 auto 32px",
+            }}
+          />
+          <p className="sb-label" style={{ color: "#e8956a", marginBottom: 12, letterSpacing: "0.15em" }}>
+            MANAGED SERVICE
+          </p>
+          <h2 className="sb-h2" style={{ color: "#eaeef1", marginBottom: 16, lineHeight: 1.15 }}>
+            Want a real human behind{" "}
+            <span style={{ color: "#f4b964" }}>your brand?</span>
+          </h2>
+          <p
+            className="sb-body"
+            style={{ color: "#6d8d9f", maxWidth: 560, margin: "0 auto 32px", lineHeight: 1.7 }}
+          >
+            Hire a professional human marketer through PixelPrism. We&apos;ll pair you with a dedicated
+            marketing expert who knows your brand, creates your content, and manages your social presence
+            — so you can focus on running your business.
+          </p>
+          <Link href="/contact">
+            <Button className="sb-btn-primary" style={{ padding: "16px 48px", fontSize: 16 }}>
+              Contact Us
+            </Button>
+          </Link>
+        </div>
+      </section>
 
       {/* ── Comparison Table ─────────────────────────────────────────────── */}
       <section
@@ -443,7 +552,6 @@ export function PricingPageContent() {
           </div>
         </div>
       </section>
-
       {/* ── Credit Packs ─────────────────────────────────────────────────── */}
       <section style={{ padding: "120px 0", background: "#071a26" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px" }}>
@@ -501,38 +609,34 @@ export function PricingPageContent() {
                       Best Value
                     </div>
                   )}
-
                   <p className="sb-data" style={{ color: "#f4b964", fontSize: 36, fontWeight: 700, marginBottom: 4 }}>
                     {pack.credits.toLocaleString()}
                   </p>
                   <p className="sb-label" style={{ color: "#6d8d9f", marginBottom: 16 }}>Credits</p>
-
                   <p className="sb-data" style={{ color: "#eaeef1", fontSize: 28, marginBottom: 4 }}>
                     ${pack.price}
                   </p>
                   <p className="sb-caption" style={{ color: "#6d8d9f", marginBottom: 24 }}>
                     ${perCredit} per credit
                   </p>
-
-                  <SignedIn>
+                  <Show when="signed-in">
                     <Button className={isBestValue ? "sb-btn-primary w-full" : "sb-btn-secondary w-full"}>
                       Buy Credits
                     </Button>
-                  </SignedIn>
-                  <SignedOut>
+                  </Show>
+                  <Show when="signed-out">
                     <Link href="/sign-up" className="w-full">
                       <Button className={isBestValue ? "sb-btn-primary w-full" : "sb-btn-secondary w-full"}>
                         Get Started
                       </Button>
                     </Link>
-                  </SignedOut>
+                  </Show>
                 </div>
-              )
+              );
             })}
           </div>
         </div>
       </section>
-
       {/* ── FAQ ──────────────────────────────────────────────────────────── */}
       <section
         style={{
@@ -568,7 +672,6 @@ export function PricingPageContent() {
           </Accordion>
         </div>
       </section>
-
       {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
       <section
         style={{
@@ -594,20 +697,20 @@ export function PricingPageContent() {
             No credit card required. Upgrade whenever you&apos;re ready.
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-            <SignedOut>
+            <Show when="signed-out">
               <Link href="/sign-up">
                 <Button className="sb-btn-primary" style={{ padding: "16px 48px", fontSize: 16 }}>
                   Get Started Free
                 </Button>
               </Link>
-            </SignedOut>
-            <SignedIn>
+            </Show>
+            <Show when="signed-in">
               <Link href="/dashboard">
                 <Button className="sb-btn-primary" style={{ padding: "16px 48px", fontSize: 16 }}>
                   Go to Dashboard
                 </Button>
               </Link>
-            </SignedIn>
+            </Show>
           </div>
           <p className="sb-caption" style={{ color: "#6d8d9f", marginTop: 24, opacity: 0.7 }}>
             No credit card required · Free plan available · Cancel anytime
@@ -615,5 +718,5 @@ export function PricingPageContent() {
         </div>
       </section>
     </MarketingLayout>
-  )
+  );
 }

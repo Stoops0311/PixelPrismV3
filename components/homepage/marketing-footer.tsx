@@ -5,8 +5,8 @@ import Link from "next/link"
 const FOOTER_LINKS = [
   { label: "Pricing", href: "/pricing" },
   { label: "Contact", href: "/contact" },
-  { label: "Privacy", href: "#" },
-  { label: "Terms", href: "#" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ]
 
 export function MarketingFooter() {

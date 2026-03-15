@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { Show } from "@clerk/nextjs";
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { CheckoutLink } from "@convex-dev/polar/react"
@@ -105,7 +105,6 @@ function PricingCards() {
                 Most Popular
               </div>
             )}
-
             {/* Gold top gradient for popular card */}
             {tier.popular && (
               <div
@@ -121,7 +120,6 @@ function PricingCards() {
                 }}
               />
             )}
-
             <CardHeader style={{ position: "relative" }}>
               <p className="sb-label" style={{ color: "#e8956a", marginBottom: 4 }}>
                 {tier.name}
@@ -138,7 +136,6 @@ function PricingCards() {
                 {tier.description}
               </p>
             </CardHeader>
-
             <CardContent className="flex flex-col flex-1">
               <ul className="space-y-3 flex-1 mb-8">
                 {tier.features.map((feature) => (
@@ -162,7 +159,7 @@ function PricingCards() {
                 ))}
               </ul>
 
-              <SignedIn>
+              <Show when="signed-in">
                 {product ? (
                   <CheckoutLink
                     polarApi={api.polar}
@@ -187,9 +184,9 @@ function PricingCards() {
                     Loading...
                   </Button>
                 )}
-              </SignedIn>
+              </Show>
 
-              <SignedOut>
+              <Show when="signed-out">
                 <Link href="/sign-up" className="w-full">
                   <Button
                     className={
@@ -199,13 +196,13 @@ function PricingCards() {
                     Get Started
                   </Button>
                 </Link>
-              </SignedOut>
+              </Show>
             </CardContent>
           </Card>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 export function PricingSection() {
@@ -229,9 +226,9 @@ export function PricingSection() {
         </div>
 
         {/* Subscription status (signed-in users only) */}
-        <SignedIn>
+        <Show when="signed-in">
           <SubscriptionStatus />
-        </SignedIn>
+        </Show>
 
         <PricingCards />
 
@@ -245,5 +242,5 @@ export function PricingSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

@@ -36,11 +36,11 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
   },
   {
-    name: "Enterprise",
+    name: "Studio",
     price: 45,
     interval: "month",
     productKey: "enterprise",
-    description: "For large organizations",
+    description: "For power users & studios",
     features: [
       "Unlimited social accounts",
       "Unlimited scheduled posts",
@@ -77,7 +77,7 @@ export const TIER_DETAILS = {
   free:         { name: "Free",          price: 0,  monthlyCredits: 5,   maxBrands: 1, maxSocialAccounts: 1,  description: "For trying things out" },
   starter:      { name: "Starter",       price: 20, monthlyCredits: 50,  maxBrands: 1, maxSocialAccounts: 2,  description: "Perfect for getting started" },
   professional: { name: "Professional",  price: 30, monthlyCredits: 100, maxBrands: 2, maxSocialAccounts: 5,  description: "For growing businesses" },
-  enterprise:   { name: "Enterprise",    price: 45, monthlyCredits: 300, maxBrands: 4, maxSocialAccounts: 10, description: "For large organizations" },
+  enterprise:   { name: "Studio",         price: 45, monthlyCredits: 300, maxBrands: 4, maxSocialAccounts: 10, description: "For power users & studios" },
 } as const
 
 export const TIER_ORDER: SubscriptionTier[] = ["free", "starter", "professional", "enterprise"]
@@ -169,12 +169,12 @@ export const FULL_TIERS: FullTier[] = [
   },
   {
     key: "enterprise",
-    name: "Enterprise",
+    name: "Studio",
     price: 45,
     monthlyCredits: 300,
     maxBrands: 4,
     maxSocialAccounts: 10,
-    description: "For large organizations",
+    description: "For power users & studios",
     popular: false,
     features: [
       "300 AI credits per month",
@@ -193,6 +193,20 @@ export type ComparisonFeature = {
   name: string
   category?: string
   values: Record<SubscriptionTier, string | boolean>
+}
+
+// ── Organization tier (contact-us, not purchasable) ──
+
+export const ORGANIZATION_TIER = {
+  name: "Organization",
+  features: [
+    "Unlimited AI credits",
+    "Unlimited brands",
+    "Unlimited social accounts",
+    "Dedicated account manager",
+    "Custom integrations & API access",
+    "Priority SLA & support",
+  ],
 }
 
 export const TIER_COMPARISON_FEATURES: ComparisonFeature[] = [
