@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
-import { useMutation, useQuery } from "convex/react"
+import { useAction, useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import {
@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/tooltip"
 import { DS2Spinner } from "@/components/ds2/spinner"
 import { StudioImagePickerDialog } from "@/components/ds2/studio-image-picker-dialog"
-import { showInfo, showSuccess } from "@/components/ds2/toast"
+import { showError, showInfo, showSuccess } from "@/components/ds2/toast"
 
 type SupportedPlatform = "instagram" | "facebook" | "linkedin" | "pinterest"
 
@@ -348,6 +348,9 @@ function PostComposerSheet({
   studioImages,
   connectedPlatforms,
   brandSlug,
+  brandId,
+  onGenerateCaptions,
+  getSelectedPlatforms,
   onSchedule,
   onSaveDraft,
 }: {
@@ -369,15 +372,70 @@ function PostComposerSheet({
   studioImages: StudioImageChoice[]
   connectedPlatforms: SupportedPlatform[]
   brandSlug: string
+  brandId: Id<"brands">
+  onGenerateCaptions: (args: {
+    brandId: Id<"brands">
+    imageId?: Id<"generatedImages">
+    imageUrl?: string
+    selectedPlatforms?: SupportedPlatform[]
+    currentCaption?: string
+  }) => Promise<{ captions: string[]; hashtags: string[] }>
+  getSelectedPlatforms: () => SupportedPlatform[]
   onSchedule: () => void
   onSaveDraft: () => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [captionOptions, setCaptionOptions] = useState<string[]>([])
   const charLimit = 2200
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) setPickerOpen(false)
+    if (!nextOpen) {
+      setPickerOpen(false)
+      setCaptionOptions([])
+      setGenerating(false)
+    }
     onOpenChange(nextOpen)
+  }
+
+  useEffect(() => {
+    setCaptionOptions([])
+  }, [selectedImage?.id])
+
+  const studioImageIds = useMemo(
+    () => new Set(studioImages.map((img) => img.id)),
+    [studioImages]
+  )
+
+  const handleGenerate = async () => {
+    if (!selectedImage?.imageUrl) {
+      showInfo("Pick an image first", "Choose an image before generating captions")
+      return
+    }
+    setGenerating(true)
+    try {
+      const realImageId = studioImageIds.has(selectedImage.id)
+        ? (selectedImage.id as Id<"generatedImages">)
+        : undefined
+      const activePlatforms = getSelectedPlatforms()
+      const result = await onGenerateCaptions({
+        brandId,
+        imageId: realImageId,
+        imageUrl: selectedImage.imageUrl,
+        selectedPlatforms: activePlatforms.length > 0 ? activePlatforms : undefined,
+        currentCaption: caption.trim().length > 0 ? caption : undefined,
+      })
+      setCaptionOptions(result.captions)
+      if (hashtags.trim().length === 0 && result.hashtags.length > 0) {
+        onHashtagsChange(result.hashtags.join(" "))
+      }
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate captions"
+      showError("Caption generation failed", message)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   return (
@@ -529,19 +587,88 @@ function PostComposerSheet({
           </div>
 
           <div
-            className="flex items-start gap-3 p-4"
+            className="p-4 space-y-3"
             style={{
               background: "rgba(244,185,100,0.04)",
               border: "1px solid rgba(244,185,100,0.08)",
             }}
           >
-            <HugeiconsIcon icon={AiChat02Icon} size={20} color="#f4b964" className="shrink-0 mt-0.5" />
-            <div>
-              <span className="sb-label" style={{ color: "#f4b964" }}>AI Suggestion</span>
-              <p className="sb-body-sm mt-1" style={{ color: "#6d8d9f" }}>
-                Caption and hashtags are manual for now. AI assist can be layered in later.
-              </p>
+            <div className="flex items-start gap-3">
+              <HugeiconsIcon icon={AiChat02Icon} size={20} color="#f4b964" className="shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="sb-label" style={{ color: "#f4b964" }}>AI Caption Assist</span>
+                <p className="sb-body-sm mt-1" style={{ color: "#6d8d9f" }}>
+                  Generate 3 caption variants from the image, product, and brand. Pick one to apply.
+                </p>
+              </div>
             </div>
+
+            <Button
+              className="sb-btn-primary w-full"
+              onClick={handleGenerate}
+              disabled={generating || !selectedImage?.imageUrl}
+            >
+              {generating ? (
+                <span className="flex items-center gap-2">
+                  <DS2Spinner />
+                  Generating with Gemini…
+                </span>
+              ) : captionOptions.length > 0 ? (
+                "Regenerate captions"
+              ) : (
+                "Generate 3 captions"
+              )}
+            </Button>
+
+            {!selectedImage?.imageUrl && (
+              <p className="sb-caption" style={{ color: "#6d8d9f" }}>
+                Pick an image first.
+              </p>
+            )}
+
+            {captionOptions.length > 0 && (
+              <div className="space-y-2 pt-1">
+                {captionOptions.map((option, idx) => {
+                  const isSelected = caption === option
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => onCaptionChange(option)}
+                      className={`sb-field-card !p-3 w-full text-left ${
+                        isSelected ? "sb-field-card--selected" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span
+                          className="sb-data"
+                          style={{
+                            fontSize: 10,
+                            color: isSelected ? "#f4b964" : "#6d8d9f",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                          }}
+                        >
+                          Option {idx + 1}
+                        </span>
+                        <span
+                          className="sb-data"
+                          style={{ fontSize: 10, color: "#6d8d9f" }}
+                        >
+                          {option.length} / {charLimit}
+                        </span>
+                      </div>
+                      <p
+                        className="sb-body-sm whitespace-pre-line"
+                        style={{ color: "#d4dce2" }}
+                      >
+                        {option}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -593,6 +720,7 @@ export default function SchedulingPage() {
   const createScheduledPost = useMutation(api.scheduledPosts.create)
   const saveDraftPost = useMutation(api.scheduledPosts.saveDraft)
   const updateScheduledPost = useMutation(api.scheduledPosts.update)
+  const generateCaptions = useAction(api.captionActions.generateCaptions)
 
   const [viewMode, setViewMode] = useState<"week" | "month">("week")
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(TODAY, { weekStartsOn: 1 }))
@@ -1028,6 +1156,9 @@ export default function SchedulingPage() {
         studioImages={studioImages.filter((img) => !!img.imageUrl)}
         connectedPlatforms={connectedPlatformKeys}
         brandSlug={params.brandSlug as string}
+        brandId={brand._id}
+        onGenerateCaptions={generateCaptions}
+        getSelectedPlatforms={getSelectedPlatforms}
         onSchedule={handleSchedule}
         onSaveDraft={handleSaveDraft}
       />

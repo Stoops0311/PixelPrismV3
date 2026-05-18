@@ -10,6 +10,7 @@
 
 import type * as analytics from "../analytics.js";
 import type * as brands from "../brands.js";
+import type * as captionActions from "../captionActions.js";
 import type * as credits from "../credits.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -35,6 +36,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   brands: typeof brands;
+  captionActions: typeof captionActions;
   credits: typeof credits;
   crons: typeof crons;
   http: typeof http;

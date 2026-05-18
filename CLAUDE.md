@@ -33,6 +33,7 @@ Required environment variables (add to `.env.local`):
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk publishable key
 - `CLERK_SECRET_KEY` — Clerk secret key (server-side only)
 - `CLERK_WEBHOOK_SECRET` — Clerk webhook signing secret (for user sync via Convex HTTP endpoints)
+- `OPENROUTER_API_KEY` — OpenRouter API key, used by the scheduling-composer caption generator (Gemini 2.5 Flash Lite). Set on Convex with `bunx convex env set OPENROUTER_API_KEY <key>` (add `--prod` for prod).
 
 ## Architecture
 
