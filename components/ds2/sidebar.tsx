@@ -16,6 +16,8 @@ import {
   Link04Icon,
   Settings01Icon,
   Logout01Icon,
+  Tag01Icon,
+  MagicWand01Icon,
 } from "@hugeicons/core-free-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -52,6 +54,8 @@ interface AppSidebarProps {
 const BRAND_NAV_ITEMS = [
   { label: "Dashboard", icon: DashboardSquare01Icon, path: "" },
   { label: "Products", icon: ShoppingBag01Icon, path: "/products", countKey: "products" as const },
+  { label: "Logos", icon: Tag01Icon, path: "/logos" },
+  { label: "Templates", icon: MagicWand01Icon, path: "/templates" },
   { label: "Studio", icon: Image02Icon, path: "/studio", countKey: "studio" as const },
   { label: "Scheduling", icon: Calendar03Icon, path: "/scheduling", countKey: "scheduling" as const },
   { label: "Analytics", icon: Analytics01Icon, path: "/analytics" },

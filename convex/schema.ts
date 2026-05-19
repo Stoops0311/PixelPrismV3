@@ -126,6 +126,51 @@ export default defineSchema({
     .index("by_product", ["productId"])
     .index("by_product_ordered", ["productId", "order"]),
 
+  brandLogos: defineTable({
+    userId: v.id("users"),
+    brandId: v.id("brands"),
+
+    imageUrl: v.string(),
+    originalFileName: v.string(),
+    fileSize: v.number(),
+    mimeType: v.string(),
+
+    order: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_brand_ordered", ["brandId", "order"]),
+
+  templates: defineTable({
+    userId: v.id("users"),
+    brandId: v.id("brands"),
+
+    name: v.string(),
+    description: v.string(),
+    styleDescription: v.string(),
+
+    referenceImageUrls: v.array(v.string()),
+    thumbnailUrl: v.string(),
+    aspectRatio: v.string(),
+
+    fields: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        type: v.union(
+          v.literal("text"),
+          v.literal("longtext"),
+          v.literal("list"),
+          v.literal("image")
+        ),
+        placeholder: v.optional(v.string()),
+      })
+    ),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_brand", ["brandId"]),
+
   // ============================================================
   // IMAGE GENERATION
   // ============================================================
@@ -172,6 +217,11 @@ export default defineSchema({
     // Reference Images
     referenceImageUrls: v.optional(v.array(v.string())),
     referenceImageCount: v.number(),
+
+    // Template usage (optional)
+    templateId: v.optional(v.id("templates")),
+    templateFieldValues: v.optional(v.string()),
+    includedBrandLogos: v.optional(v.boolean()),
 
     // Status
     status: v.union(

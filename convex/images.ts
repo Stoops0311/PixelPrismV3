@@ -1,6 +1,7 @@
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
+import type { Doc } from "./_generated/dataModel"
 
 // ============================================================
 // HELPERS
@@ -145,6 +146,9 @@ export const createBatch = mutation({
     stylePreset: v.optional(v.string()),
     negativePrompt: v.optional(v.string()),
     seed: v.optional(v.number()),
+    templateId: v.optional(v.id("templates")),
+    templateFieldValues: v.optional(v.any()),
+    includeBrandLogos: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx)
@@ -212,6 +216,72 @@ export const createBatch = mutation({
       }
     }
 
+    // Resolve template if provided
+    let template: Doc<"templates"> | null = null
+    let templateFieldValuesJson: string | undefined
+    let templateRendered = ""
+    if (args.templateId) {
+      template = await ctx.db.get(args.templateId)
+      if (!template || template.userId !== user._id) {
+        throw new Error("Template not found")
+      }
+      // Template's reference images go first so the model uses them as the visual anchor.
+      referenceImageUrls = [
+        ...template.referenceImageUrls,
+        ...referenceImageUrls,
+      ]
+
+      const values =
+        args.templateFieldValues && typeof args.templateFieldValues === "object"
+          ? (args.templateFieldValues as Record<string, unknown>)
+          : {}
+      templateFieldValuesJson = JSON.stringify(values)
+
+      // Append image-field values to reference images, render textual values for the prompt
+      const renderedLines: string[] = []
+      for (const field of template.fields) {
+        const raw = values[field.id]
+        if (field.type === "image") {
+          if (typeof raw === "string" && raw.length > 0) {
+            referenceImageUrls.push(raw)
+            renderedLines.push(`${field.name}: use the provided photo`)
+          }
+        } else if (field.type === "list") {
+          const items = Array.isArray(raw)
+            ? raw.filter((s) => typeof s === "string" && s.trim().length > 0)
+            : typeof raw === "string"
+              ? raw
+                  .split("\n")
+                  .map((s) => s.trim())
+                  .filter((s) => s.length > 0)
+              : []
+          if (items.length > 0) {
+            renderedLines.push(
+              `${field.name}:\n${items.map((i) => `  - ${i}`).join("\n")}`
+            )
+          }
+        } else {
+          if (typeof raw === "string" && raw.trim().length > 0) {
+            renderedLines.push(`${field.name}: "${raw.trim()}"`)
+          }
+        }
+      }
+      templateRendered = renderedLines.join("\n")
+    }
+
+    // Append brand logos if requested
+    let logoUrls: string[] = []
+    if (args.includeBrandLogos) {
+      const logos = await ctx.db
+        .query("brandLogos")
+        .withIndex("by_brand", (q: any) => q.eq("brandId", args.brandId))
+        .collect()
+      logoUrls = logos
+        .sort((a, b) => a.order - b.order)
+        .map((l) => l.imageUrl)
+      referenceImageUrls = [...referenceImageUrls, ...logoUrls]
+    }
+
     // Deduct credits
     await ctx.runMutation(internal.credits.deductInternal, {
       userId: user._id,
@@ -228,8 +298,31 @@ export const createBatch = mutation({
       },
     })
 
-    // Build fullPrompt — stylePreset contains the actual prompt suffix (e.g. ", professional product photography...")
-    const fullPrompt = args.prompt + (args.stylePreset || "")
+    // Build fullPrompt
+    let fullPrompt: string
+    if (template) {
+      const parts: string[] = [template.styleDescription]
+      if (templateRendered) {
+        parts.push("\nFill the template with the following content:")
+        parts.push(templateRendered)
+      }
+      if (args.prompt && args.prompt.trim().length > 0) {
+        parts.push(`\nAdditional notes: ${args.prompt.trim()}`)
+      }
+      if (logoUrls.length > 0) {
+        parts.push(
+          `\nComposite the ${logoUrls.length} provided brand logo${logoUrls.length === 1 ? "" : "s"} into the logo area of the layout, preserving each logo's original artwork.`
+        )
+      }
+      fullPrompt = parts.join("\n")
+    } else {
+      // stylePreset contains the actual prompt suffix (e.g. ", professional product photography...")
+      let base = args.prompt + (args.stylePreset || "")
+      if (logoUrls.length > 0) {
+        base += `\n\nComposite the ${logoUrls.length} provided brand logo${logoUrls.length === 1 ? "" : "s"} into a header area near the top of the image, preserving each logo's original artwork.`
+      }
+      fullPrompt = base
+    }
 
     const model = MODEL_MAP[args.qualityTier]
     const now = Date.now()
@@ -252,6 +345,9 @@ export const createBatch = mutation({
         referenceImageUrls:
           referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
         referenceImageCount: referenceImageUrls.length,
+        templateId: args.templateId,
+        templateFieldValues: templateFieldValuesJson,
+        includedBrandLogos: args.includeBrandLogos ? true : undefined,
         status: "generating",
         creditsUsed: costPerImage,
         refunded: false,

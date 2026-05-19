@@ -255,6 +255,11 @@ export default function StudioPage() {
         productId: (config.productIds?.[0] ?? undefined) as Id<"products"> | undefined,
         referenceImageId: config.referenceImageId ? (config.referenceImageId as Id<"generatedImages">) : undefined,
         stylePreset: config.stylePreset || undefined,
+        templateId: config.templateId
+          ? (config.templateId as Id<"templates">)
+          : undefined,
+        templateFieldValues: config.templateFieldValues,
+        includeBrandLogos: config.includeBrandLogos,
       })
 
       clearInterval(interval)

@@ -121,6 +121,9 @@ export interface GenerationConfig {
   quantity: number
   productIds?: string[]
   referenceImageId?: string
+  templateId?: string
+  templateFieldValues?: Record<string, string | string[]>
+  includeBrandLogos?: boolean
 }
 
 export interface GeneratedImage {

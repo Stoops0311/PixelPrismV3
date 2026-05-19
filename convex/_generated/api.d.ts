@@ -9,6 +9,7 @@
  */
 
 import type * as analytics from "../analytics.js";
+import type * as brandLogos from "../brandLogos.js";
 import type * as brands from "../brands.js";
 import type * as captionActions from "../captionActions.js";
 import type * as credits from "../credits.js";
@@ -24,6 +25,8 @@ import type * as productImages from "../productImages.js";
 import type * as products from "../products.js";
 import type * as scheduledPosts from "../scheduledPosts.js";
 import type * as socialAccounts from "../socialAccounts.js";
+import type * as templateActions from "../templateActions.js";
+import type * as templates from "../templates.js";
 import type * as users from "../users.js";
 import type * as webhookLogs from "../webhookLogs.js";
 
@@ -35,6 +38,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
+  brandLogos: typeof brandLogos;
   brands: typeof brands;
   captionActions: typeof captionActions;
   credits: typeof credits;
@@ -50,6 +54,8 @@ declare const fullApi: ApiFromModules<{
   products: typeof products;
   scheduledPosts: typeof scheduledPosts;
   socialAccounts: typeof socialAccounts;
+  templateActions: typeof templateActions;
+  templates: typeof templates;
   users: typeof users;
   webhookLogs: typeof webhookLogs;
 }>;

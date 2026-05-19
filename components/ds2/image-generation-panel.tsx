@@ -1,12 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Image02Icon,
   Cancel01Icon,
   ArrowRight02Icon,
   MagicWand01Icon,
+  Add01Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,11 +21,15 @@ import {
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { showInfo } from "@/components/ds2/toast"
-import { ColorGrid } from "@/components/ds2/color-grid"
 import { ProductMultiSelect } from "@/components/ds2/product-multi-select"
 import { AddProductDialog } from "@/components/ds2/add-product-dialog"
 import { UpgradeDialog } from "@/components/ds2/upgrade-dialog"
 import { useUpgradeDialog } from "@/hooks/use-upgrade-dialog"
+import {
+  TemplateFieldForm,
+  type TemplateFieldValues,
+} from "@/components/ds2/template-field-form"
+import { CreateTemplateWizard } from "@/components/ds2/create-template-wizard"
 import type { SubscriptionTier } from "@/lib/polar"
 import type { Id } from "@/convex/_generated/dataModel"
 import type { Product, GeneratedImage, GenerationConfig } from "@/types/dashboard"
@@ -30,7 +37,6 @@ import type { Product, GeneratedImage, GenerationConfig } from "@/types/dashboar
 // ── Style options ───────────────────────────────────────────────────────
 
 const STYLE_OPTIONS = [
-  { id: "none", label: "None", image: null, gradient: "linear-gradient(135deg, #1a2530, #0d1a24)", promptSuffix: "" },
   { id: "product-shot", label: "Product Shot", image: "/style-previews/product-shot.png", gradient: "linear-gradient(135deg, #2a3a4a, #1a2a3a)", promptSuffix: ", professional product photography, studio lighting, clean background, high detail, commercial quality, sharp focus" },
   { id: "lifestyle", label: "Lifestyle", image: "/style-previews/lifestyle.png", gradient: "linear-gradient(135deg, #3a4a2a, #2a3a1a)", promptSuffix: ", lifestyle photography, natural lighting, soft focus, warm tones, cozy atmosphere, candid feel" },
   { id: "flat-lay", label: "Flat Lay", image: "/style-previews/flat-lay.png", gradient: "linear-gradient(135deg, #4a3a2a, #3a2a1a)", promptSuffix: ", flat lay photography, top-down view, organized arrangement, minimalist composition, clean styling" },
@@ -44,8 +50,11 @@ const QUALITY_OPTIONS = [
 ]
 
 const ASPECT_OPTIONS = ["1:1", "9:16", "16:9", "3:4", "4:3", "3:2"] as const
+type AspectRatio = typeof ASPECT_OPTIONS[number]
 
 const QUALITY_COSTS: Record<string, number> = { standard: 0.5, hd: 1, ultra: 1.5 }
+
+type GenerationMode = "none" | "style" | "template"
 
 // ── Component ───────────────────────────────────────────────────────────
 
@@ -82,9 +91,14 @@ export function ImageGenerationPanel({
     preSelectedProduct ? [preSelectedProduct.id] : []
   )
   const [prompt, setPrompt] = useState("")
-  const [selectedStyle, setSelectedStyle] = useState("none")
+  const [mode, setMode] = useState<GenerationMode>("none")
+  const [selectedStyle, setSelectedStyle] = useState<string>(STYLE_OPTIONS[0].id)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<Id<"templates"> | "">("")
+  const [templateValues, setTemplateValues] = useState<TemplateFieldValues>({})
+  const [includeBrandLogos, setIncludeBrandLogos] = useState(true)
+  const [aspectLocked, setAspectLocked] = useState(false)
   const [quality, setQuality] = useState<"standard" | "hd" | "ultra">("hd")
-  const [aspectRatio, setAspectRatio] = useState<typeof ASPECT_OPTIONS[number]>("1:1")
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1")
   const [quantity, setQuantity] = useState(4)
   const [isDragOver, setIsDragOver] = useState(false)
   const [flashStyle, setFlashStyle] = useState<string | null>(null)
@@ -92,10 +106,26 @@ export function ImageGenerationPanel({
   const [referenceGlow, setReferenceGlow] = useState(false)
   const [newProductDialogOpen, setNewProductDialogOpen] = useState(false)
   const [refPickerOpen, setRefPickerOpen] = useState(false)
+  const [templateWizardOpen, setTemplateWizardOpen] = useState(false)
   const upgrade = useUpgradeDialog()
   const dropZoneHintRef = useRef(false)
   const prevCostRef = useRef(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // ── Convex: templates + logos ────────────────────────────────────────
+  const templates = useQuery(
+    api.templates.list,
+    brandId ? { brandId } : "skip"
+  )
+  const brandLogos = useQuery(
+    api.brandLogos.list,
+    brandId ? { brandId } : "skip"
+  )
+
+  const selectedTemplate = useMemo(() => {
+    if (!selectedTemplateId || !templates) return null
+    return templates.find((t) => t._id === selectedTemplateId) ?? null
+  }, [selectedTemplateId, templates])
 
   // Pre-select product from URL
   useEffect(() => {
@@ -110,14 +140,45 @@ export function ImageGenerationPanel({
     if (!el) return
     el.style.height = "auto"
     el.style.height = Math.max(100, el.scrollHeight) + "px"
-  }, [prompt])
+  }, [prompt, mode])
+
+  // Auto-sync aspect ratio when a template is selected (unless user has locked override)
+  useEffect(() => {
+    if (mode === "template" && selectedTemplate && !aspectLocked) {
+      const tplAR = selectedTemplate.aspectRatio as AspectRatio
+      if (ASPECT_OPTIONS.includes(tplAR)) {
+        setAspectRatio(tplAR)
+      }
+    }
+  }, [mode, selectedTemplate, aspectLocked])
+
+  // Reset template field values when switching templates
+  useEffect(() => {
+    if (!selectedTemplate) {
+      setTemplateValues({})
+      return
+    }
+    setTemplateValues((prev) => {
+      const next: TemplateFieldValues = {}
+      for (const field of selectedTemplate.fields) {
+        if (prev[field.id] !== undefined) {
+          next[field.id] = prev[field.id]
+        } else if (field.type === "list") {
+          next[field.id] = [""]
+        } else {
+          next[field.id] = ""
+        }
+      }
+      return next
+    })
+    setAspectLocked(false)
+  }, [selectedTemplate])
 
   // Cost calculation
   const totalCost = QUALITY_COSTS[quality] * quantity
   const remainingAfter = availableCredits - totalCost
   const insufficientCredits = totalCost > availableCredits
 
-  // Flash cost on change
   useEffect(() => {
     if (prevCostRef.current !== 0 && prevCostRef.current !== totalCost) {
       setCostFlash(true)
@@ -127,34 +188,63 @@ export function ImageGenerationPanel({
     prevCostRef.current = totalCost
   }, [totalCost])
 
-  // Style card selection with flash
   const handleStyleSelect = useCallback((styleId: string) => {
-    // Toggle: clicking already-selected style deselects to "none"
-    if (styleId === selectedStyle && styleId !== "none") {
-      setSelectedStyle("none")
-      return
-    }
     setSelectedStyle(styleId)
     setFlashStyle(styleId)
     setTimeout(() => setFlashStyle(null), 300)
-  }, [selectedStyle])
+  }, [])
 
-  // Get the prompt suffix for the selected style
   const selectedStyleOption = STYLE_OPTIONS.find((s) => s.id === selectedStyle)
+
+  // ── Generate validity ────────────────────────────────────────────────
+  const canGenerate = useMemo(() => {
+    if (mode === "template") {
+      return !!selectedTemplate
+    }
+    return prompt.trim().length > 0
+  }, [mode, selectedTemplate, prompt])
 
   // Generate
   const handleGenerate = useCallback(() => {
+    const stylePreset =
+      mode === "style" ? selectedStyleOption?.promptSuffix ?? "" : ""
+
     onGenerate({
-      prompt,
-      style: selectedStyle,
-      stylePreset: selectedStyleOption?.promptSuffix ?? "",
+      prompt: mode === "template" ? "" : prompt,
+      style: mode === "style" ? selectedStyle : "none",
+      stylePreset,
       quality,
       aspectRatio,
       quantity,
       productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
       referenceImageId: referenceImage?.id,
+      templateId:
+        mode === "template" && selectedTemplate
+          ? (selectedTemplate._id as string)
+          : undefined,
+      templateFieldValues:
+        mode === "template" && selectedTemplate
+          ? templateValues
+          : undefined,
+      includeBrandLogos:
+        brandLogos && brandLogos.length > 0 ? includeBrandLogos : undefined,
     })
-  }, [prompt, selectedStyle, selectedStyleOption, quality, aspectRatio, quantity, selectedProductIds, referenceImage, onGenerate])
+  }, [
+    mode,
+    prompt,
+    selectedStyle,
+    selectedStyleOption,
+    quality,
+    aspectRatio,
+    quantity,
+    selectedProductIds,
+    referenceImage,
+    selectedTemplate,
+    templateValues,
+    brandLogos,
+    includeBrandLogos,
+    onGenerate,
+  ])
 
   // Drop zone handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -180,6 +270,13 @@ export function ImageGenerationPanel({
     }
   }, [onReferenceImageChange])
 
+  const hasLogos = !!brandLogos && brandLogos.length > 0
+  const hasTemplates = !!templates && templates.length > 0
+  const templateARMismatch =
+    mode === "template" &&
+    selectedTemplate &&
+    aspectRatio !== selectedTemplate.aspectRatio
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -187,85 +284,225 @@ export function ImageGenerationPanel({
         Generate
       </h3>
 
-      {/* Prompt — front and center */}
+      {/* Mode: None / Style / Template */}
       <div>
         <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
-          Prompt
+          Style or Template
         </label>
-        <Textarea
-          ref={textareaRef}
-          placeholder="Describe the image you want to generate..."
-          className="min-h-[100px]"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          style={{ resize: "none", overflow: "hidden" }}
-        />
-      </div>
-
-      {/* Style selector (optional — defaults to None) */}
-      <div>
-        <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
-          Style (optional)
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          {STYLE_OPTIONS.filter((s) => s.id !== "none").map((style) => {
-            const isSelected = selectedStyle === style.id
-            const isFlashing = flashStyle === style.id
-            return (
-              <button
-                key={style.id}
-                onClick={() => handleStyleSelect(style.id)}
-                className="text-left cursor-pointer"
-                style={{
-                  border: `1px solid ${
-                    isSelected
-                      ? "rgba(244,185,100,0.22)"
-                      : "rgba(244,185,100,0.12)"
-                  }`,
-                  background: isSelected
-                    ? "rgba(244,185,100,0.04)"
-                    : "rgba(255,255,255,0.02)",
-                  padding: 8,
-                  transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  animation: isFlashing
-                    ? "sb-style-flash 300ms cubic-bezier(0.34, 1.56, 0.64, 1)"
-                    : undefined,
-                }}
-              >
-                {style.image ? (
-                  <img
-                    src={style.image}
-                    alt={style.label}
-                    style={{
-                      height: 48,
-                      width: "100%",
-                      objectFit: "cover",
-                      marginBottom: 6,
-                      border: "1px solid rgba(244,185,100,0.06)",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      height: 48,
-                      background: style.gradient,
-                      marginBottom: 6,
-                      border: "1px solid rgba(244,185,100,0.06)",
-                    }}
-                  />
-                )}
-                <span
-                  className="sb-caption"
-                  style={{ color: isSelected ? "#eaeef1" : "#6d8d9f" }}
-                >
-                  {style.label}
-                </span>
-              </button>
-            )
-          })}
+        <div className="flex gap-2">
+          {(["none", "style", "template"] as GenerationMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className="flex-1 text-center cursor-pointer"
+              style={{
+                padding: "10px 8px",
+                border: `1px solid ${
+                  mode === m
+                    ? "rgba(244,185,100,0.22)"
+                    : "rgba(244,185,100,0.12)"
+                }`,
+                background:
+                  mode === m ? "#f4b964" : "rgba(255,255,255,0.02)",
+                color: mode === m ? "#071a26" : "#d4dce2",
+                fontFamily: "'Neue Montreal', sans-serif",
+                fontWeight: 500,
+                fontSize: "13px",
+                letterSpacing: "0.06em",
+                transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                textTransform: "capitalize",
+              }}
+            >
+              {m}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Prompt (None / Style mode) OR Template form (Template mode) */}
+      {mode !== "template" ? (
+        <>
+          <div>
+            <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
+              Prompt
+            </label>
+            <Textarea
+              ref={textareaRef}
+              placeholder="Describe the image you want to generate..."
+              className="min-h-[100px]"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              style={{ resize: "none", overflow: "hidden" }}
+            />
+          </div>
+
+          {mode === "style" && (
+            <div>
+              <label
+                className="sb-label block mb-2"
+                style={{ color: "#e8956a" }}
+              >
+                Style
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {STYLE_OPTIONS.map((style) => {
+                  const isSelected = selectedStyle === style.id
+                  const isFlashing = flashStyle === style.id
+                  return (
+                    <button
+                      key={style.id}
+                      onClick={() => handleStyleSelect(style.id)}
+                      className="text-left cursor-pointer"
+                      style={{
+                        border: `1px solid ${
+                          isSelected
+                            ? "rgba(244,185,100,0.22)"
+                            : "rgba(244,185,100,0.12)"
+                        }`,
+                        background: isSelected
+                          ? "rgba(244,185,100,0.04)"
+                          : "rgba(255,255,255,0.02)",
+                        padding: 8,
+                        transition:
+                          "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                        animation: isFlashing
+                          ? "sb-style-flash 300ms cubic-bezier(0.34, 1.56, 0.64, 1)"
+                          : undefined,
+                      }}
+                    >
+                      {style.image ? (
+                        <img
+                          src={style.image}
+                          alt={style.label}
+                          style={{
+                            height: 48,
+                            width: "100%",
+                            objectFit: "cover",
+                            marginBottom: 6,
+                            border: "1px solid rgba(244,185,100,0.06)",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            height: 48,
+                            background: style.gradient,
+                            marginBottom: 6,
+                            border: "1px solid rgba(244,185,100,0.06)",
+                          }}
+                        />
+                      )}
+                      <span
+                        className="sb-caption"
+                        style={{
+                          color: isSelected ? "#eaeef1" : "#6d8d9f",
+                        }}
+                      >
+                        {style.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Template picker */}
+          <div>
+            <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
+              Template
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={selectedTemplateId}
+                onChange={(e) =>
+                  setSelectedTemplateId(e.target.value as Id<"templates"> | "")
+                }
+                className="flex-1"
+                style={{
+                  padding: "10px 12px",
+                  background: "rgba(255,255,255,0.02)",
+                  color: "#d4dce2",
+                  border: "1px solid rgba(244,185,100,0.12)",
+                  fontFamily: "'General Sans', sans-serif",
+                  fontSize: 13,
+                }}
+              >
+                <option value="">
+                  {hasTemplates
+                    ? "Choose a template…"
+                    : "No templates yet"}
+                </option>
+                {templates?.map((t) => (
+                  <option key={t._id} value={t._id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setTemplateWizardOpen(true)}
+                className="cursor-pointer flex items-center gap-1 shrink-0"
+                style={{
+                  padding: "0 12px",
+                  border: "1px solid rgba(244,185,100,0.22)",
+                  background: "transparent",
+                  color: "#f4b964",
+                  fontSize: 12,
+                  letterSpacing: "0.04em",
+                  transition: "all 200ms ease",
+                }}
+                aria-label="Create template"
+              >
+                <HugeiconsIcon icon={Add01Icon} size={12} />
+                New
+              </button>
+            </div>
+            {selectedTemplate?.description && (
+              <p
+                className="sb-caption mt-2"
+                style={{ color: "#6d8d9f", fontStyle: "italic" }}
+              >
+                {selectedTemplate.description}
+              </p>
+            )}
+          </div>
+
+          {selectedTemplate ? (
+            <div>
+              <label
+                className="sb-label block mb-2"
+                style={{ color: "#e8956a" }}
+              >
+                Fill template
+              </label>
+              <TemplateFieldForm
+                fields={selectedTemplate.fields}
+                values={templateValues}
+                onChange={setTemplateValues}
+              />
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center"
+              style={{
+                padding: "24px",
+                border: "1px dashed rgba(244,185,100,0.18)",
+                background: "rgba(244,185,100,0.02)",
+              }}
+            >
+              <p className="sb-caption" style={{ color: "#6d8d9f" }}>
+                {hasTemplates
+                  ? "Pick a template above to start."
+                  : "Create your first template to use this mode."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Separator */}
       <div style={{ height: 1, background: "rgba(244,185,100,0.08)" }} />
@@ -447,6 +684,74 @@ export function ImageGenerationPanel({
         </Dialog>
       </div>
 
+      {/* Brand logos toggle */}
+      {hasLogos && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setIncludeBrandLogos((v) => !v)}
+            className="w-full cursor-pointer flex items-center justify-between gap-3"
+            style={{
+              padding: "10px 12px",
+              border: `1px solid ${
+                includeBrandLogos
+                  ? "rgba(244,185,100,0.22)"
+                  : "rgba(244,185,100,0.10)"
+              }`,
+              background: includeBrandLogos
+                ? "rgba(244,185,100,0.04)"
+                : "rgba(255,255,255,0.02)",
+              transition: "all 200ms ease",
+            }}
+          >
+            <div className="flex flex-col items-start">
+              <span
+                className="sb-label"
+                style={{
+                  color: includeBrandLogos ? "#eaeef1" : "#6d8d9f",
+                }}
+              >
+                Include brand logos ({brandLogos!.length})
+              </span>
+              <span
+                className="sb-caption"
+                style={{ color: "#6d8d9f" }}
+              >
+                {includeBrandLogos
+                  ? "Composited into every generation"
+                  : "Logos won't be included"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {brandLogos!.slice(0, 4).map((logo) => (
+                <div
+                  key={logo._id}
+                  className="overflow-hidden"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    background: "#071a26",
+                    border: "1px solid rgba(244,185,100,0.12)",
+                    padding: 2,
+                    opacity: includeBrandLogos ? 1 : 0.4,
+                  }}
+                >
+                  <img
+                    src={logo.imageUrl}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* Separator */}
       <div style={{ height: 1, background: "rgba(244,185,100,0.08)" }} />
 
@@ -495,35 +800,64 @@ export function ImageGenerationPanel({
 
       {/* Aspect Ratio */}
       <div>
-        <label className="sb-label block mb-2" style={{ color: "#e8956a" }}>
-          Aspect Ratio
-        </label>
-        <div className="flex gap-2">
-          {ASPECT_OPTIONS.map((ratio) => (
+        <div className="flex items-center justify-between mb-2">
+          <label className="sb-label" style={{ color: "#e8956a" }}>
+            Aspect Ratio
+          </label>
+          {mode === "template" && selectedTemplate && (
             <button
-              key={ratio}
-              onClick={() => setAspectRatio(ratio)}
-              className="flex-1 text-center cursor-pointer"
-              style={{
-                padding: "10px 8px",
-                border: `1px solid ${
-                  aspectRatio === ratio
-                    ? "rgba(244,185,100,0.22)"
-                    : "rgba(244,185,100,0.12)"
-                }`,
-                background:
-                  aspectRatio === ratio ? "#f4b964" : "rgba(255,255,255,0.02)",
-                color: aspectRatio === ratio ? "#071a26" : "#d4dce2",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontWeight: 700,
-                fontSize: "13px",
-                transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-              }}
+              type="button"
+              onClick={() => setAspectLocked((v) => !v)}
+              className="sb-caption cursor-pointer"
+              style={{ color: "#f4b964" }}
             >
-              {ratio}
+              {aspectLocked ? "Use template AR" : "Override"}
             </button>
-          ))}
+          )}
         </div>
+        <div className="flex gap-2 flex-wrap">
+          {ASPECT_OPTIONS.map((ratio) => {
+            const disabled =
+              mode === "template" && !!selectedTemplate && !aspectLocked
+            return (
+              <button
+                key={ratio}
+                onClick={() => !disabled && setAspectRatio(ratio)}
+                disabled={disabled && ratio !== aspectRatio}
+                className="flex-1 text-center cursor-pointer"
+                style={{
+                  padding: "10px 8px",
+                  border: `1px solid ${
+                    aspectRatio === ratio
+                      ? "rgba(244,185,100,0.22)"
+                      : "rgba(244,185,100,0.12)"
+                  }`,
+                  background:
+                    aspectRatio === ratio
+                      ? "#f4b964"
+                      : "rgba(255,255,255,0.02)",
+                  color: aspectRatio === ratio ? "#071a26" : "#d4dce2",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  fontSize: "13px",
+                  transition: "all 250ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  opacity: disabled && ratio !== aspectRatio ? 0.4 : 1,
+                  cursor:
+                    disabled && ratio !== aspectRatio
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {ratio}
+              </button>
+            )
+          })}
+        </div>
+        {templateARMismatch && aspectLocked && (
+          <p className="sb-caption mt-1" style={{ color: "#e8956a" }}>
+            Differs from template&apos;s {selectedTemplate?.aspectRatio}
+          </p>
+        )}
       </div>
 
       {/* Quantity */}
@@ -601,7 +935,7 @@ export function ImageGenerationPanel({
         <div className={`relative ${insufficientCredits ? "flex-1" : "w-full"}`}>
           <Button
             className="sb-btn-primary w-full"
-            disabled={insufficientCredits || isGenerating || !prompt.trim()}
+            disabled={insufficientCredits || isGenerating || !canGenerate}
             onClick={handleGenerate}
           >
             {isGenerating ? "Generating..." : "Generate"}
@@ -619,6 +953,13 @@ export function ImageGenerationPanel({
         onOpenChange={upgrade.onOpenChange}
         context={upgrade.context}
         currentTier={currentTier}
+      />
+
+      <CreateTemplateWizard
+        brandId={brandId}
+        open={templateWizardOpen}
+        onOpenChange={setTemplateWizardOpen}
+        onCreated={(id) => setSelectedTemplateId(id)}
       />
     </div>
   )
