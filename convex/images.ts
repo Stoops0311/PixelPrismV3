@@ -23,7 +23,7 @@ const CREDIT_COSTS = { standard: 0.5, mid: 1, premium: 1.5 } as const
 const MODEL_MAP = {
   standard: "qwen/qwen-image-2512",
   mid: "bytedance/seedream-4",
-  premium: "bytedance/seedream-4.5",
+  premium: "google/nano-banana-2",
 } as const
 
 // ============================================================

@@ -189,7 +189,8 @@ export default defineSchema({
     model: v.union(
       v.literal("bytedance/seedream-4.5"),
       v.literal("bytedance/seedream-4"),
-      v.literal("qwen/qwen-image-2512")
+      v.literal("qwen/qwen-image-2512"),
+      v.literal("google/nano-banana-2")
     ),
     qualityTier: v.union(
       v.literal("standard"),

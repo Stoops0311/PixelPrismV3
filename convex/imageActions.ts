@@ -56,9 +56,22 @@ export const generate = internalAction({
     const isSeedream =
       image.model === "bytedance/seedream-4.5" ||
       image.model === "bytedance/seedream-4"
+    const isNanoBanana = image.model === "google/nano-banana-2"
 
     let input: Record<string, any>
-    if (isSeedream) {
+    if (isNanoBanana) {
+      // nano-banana-2 supports up to 14 reference images
+      const refs = (image.referenceImageUrls ?? []).slice(0, 14)
+      input = {
+        prompt: image.fullPrompt,
+        aspect_ratio: image.aspectRatio,
+        resolution: "2K",
+        output_format: "jpg",
+      }
+      if (refs.length > 0) {
+        input.image_input = refs
+      }
+    } else if (isSeedream) {
       input = {
         prompt: image.fullPrompt,
         aspect_ratio: image.aspectRatio,
